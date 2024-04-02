@@ -1,0 +1,9 @@
+.idea
+frontend/.idea
+frontend/dist
+frontend/node_modules
+backend/remove_binlog.json
+backend/cmd/cli.log
+backend/cmd/cmd
+backend/cmd/cmd.exe
+backend/cmd/remove_binlog.json
