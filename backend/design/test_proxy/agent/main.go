@@ -1,8 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"github.com/gin-gonic/gin"
+	"flag"
 	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/heartbeat"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -13,7 +12,8 @@ import (
 
 var (
 	//nodeAddr = "58.221.37.228:5566"
-	nodeAddr = "127.0.0.1:5566"
+	//nodeAddr = "127.0.0.1:5566"
+	nodeAddr = flag.String("node_addr", "", "")
 )
 
 type Listener struct {
@@ -24,9 +24,15 @@ type Listener struct {
 
 func main() {
 
+	flag.Parse()
+
 	log.SetLevel(log.DebugLevel)
 
 	log.Debugf("AGENT start.")
+
+	if *nodeAddr == "" {
+		panic("empty node addr")
+	}
 
 	listener := &Listener{connChan: make(chan net.Conn), needConnChan: make(chan int64)}
 
@@ -34,13 +40,14 @@ func main() {
 
 	go listener.StartDial()
 
-	g := gin.Default()
-	g.GET("/ping/:id", func(c *gin.Context) {
-		log.Debugf("client call ping")
-		c.String(200, fmt.Sprintf("pong %v", time.Now()))
-	})
+	//g := gin.Default()
+	//g.GET("/ping/:id", func(c *gin.Context) {
+	//	log.Debugf("client call ping")
+	//	c.String(200, fmt.Sprintf("pong %v", time.Now()))
+	//})
+	//
 
-	srv := &http.Server{Handler: g}
+	srv := &http.Server{Handler: &PortProxy{}}
 
 	err := srv.Serve(listener)
 	if err != nil {
@@ -54,7 +61,7 @@ func (l *Listener) runDaemonConn() {
 	for {
 		round++
 		log.Debugf("runDaemonConn start dial. round=%v", round)
-		conn, err := net.Dial("tcp", nodeAddr)
+		conn, err := net.Dial("tcp", *nodeAddr)
 		if err != nil {
 			log.Errorf("Dial err:%v", err)
 			time.Sleep(5 * time.Second)
@@ -83,8 +90,8 @@ func (l *Listener) StartDial() {
 	for {
 		<-l.needConnChan
 		round++
-		log.Debugf("dial conn start. round=%v nodeAddr=%v", round, nodeAddr)
-		conn, err := net.Dial("tcp", nodeAddr)
+		log.Debugf("dial conn start. round=%v nodeAddr=%v", round, *nodeAddr)
+		conn, err := net.Dial("tcp", *nodeAddr)
 		if err != nil {
 			log.Errorf("Dial err:%v", err)
 			time.Sleep(5 * time.Second)
@@ -144,7 +151,7 @@ func (l *Listener) Close() error {
 }
 
 func (l *Listener) Addr() net.Addr {
-	h, p, _ := net.SplitHostPort(nodeAddr)
+	h, p, _ := net.SplitHostPort(*nodeAddr)
 	addr := &net.TCPAddr{IP: net.ParseIP(h)}
 	addr.Port, _ = strconv.Atoi(p)
 	return addr

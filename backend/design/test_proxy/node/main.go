@@ -8,13 +8,16 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 )
 
 var (
-	tcpPort   = "5566"
-	servePort = "5565"
+	tcpPort     = "5566"
+	servePort   = "5565"
+	routePrefix = "drive-reverse-proxy-test"
 )
 
 type Node struct {
@@ -72,10 +75,27 @@ func (node *Node) reverseProxy() *httputil.ReverseProxy {
 		Director: func(req *http.Request) {
 			node.callDirectorApiCount++
 			//TODO: parse path
+
+			pathElems := strings.Split(req.URL.Path, "/")
+			if len(pathElems) <= 3 {
+				log.Debugf("err: len(pathElems) <= 3: %v", pathElems)
+				return
+			}
+
+			if pathElems[1] != routePrefix {
+				log.Debugf("pathElems[1] != routePrefix elem:%v prefix:%v", pathElems[1], routePrefix)
+				return
+			}
+
+			log.Debugf("before parse path, req.URL.Path:%v", req.URL.Path)
+			req.URL.Path = "/" + filepath.Join(pathElems[2:]...)
+			log.Debugf("after parse path, req.URL.Path:%v", req.URL.Path)
+
 			if req.URL.Scheme == "" {
 				req.URL.Scheme = "http"
 			}
 			req.URL.Host = "127.0.0.1"
+
 			log.Debugf("reverseProxy.Director reqUrl:%v", req.URL.String())
 		},
 		Transport: &http.Transport{
@@ -107,7 +127,9 @@ func (node *Node) dialContext(ctx context.Context, network, addr string) (conn n
 	node.needMoreConnChan <- dialID
 	log.Debugf("dialContext send need more conn sig succ.waiting conn chan...")
 	conn = <-node.connChan
+	//TODO: before return, check if conn is healthy (by KEEP_ALIVE or other msg)
 	log.Debugf("dialContext conn start work")
+	node.acceptConnCount++
 	return
 }
 
@@ -142,7 +164,11 @@ func (node *Node) StartAccept() {
 		if firstHb.Data() == "I_AM_DAEMON_CONN" {
 			node.startDaemonConn(conn)
 		} else {
-			node.connChan <- conn
+			select {
+			case <-time.After(3 * time.Minute):
+				log.Debugf("recv a chan but TOO LONG no use")
+			case node.connChan <- conn:
+			}
 		}
 
 	}
@@ -156,8 +182,6 @@ func (node *Node) startDaemonConn(conn net.Conn) {
 		log.Errorf("startDaemonConn Write err:%v", err)
 	}
 
-	node.daemonConn = conn
-
 	h := heartbeat.NewHandler(conn)
 
 	//keep alive
@@ -169,6 +193,7 @@ func (node *Node) startDaemonConn(conn net.Conn) {
 			_, err := h.Request("KEEP_ALIVE", false)
 			if err == nil {
 				log.Debugf("startDaemonConn keep alive succ!")
+				node.daemonConn = conn
 				continue
 			}
 
@@ -194,4 +219,9 @@ func (node *Node) startDaemonConn(conn net.Conn) {
 		}
 	}()
 
+}
+
+func write(w http.ResponseWriter, code int, input string) {
+	w.Write([]byte(input))
+	w.WriteHeader(code)
 }
