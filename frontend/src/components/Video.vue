@@ -1,5 +1,6 @@
 <template>
   <van-config-provider theme="dark">
+  <van-button style="position:absolute;z-index: 999" @click="switchPing">PING</van-button>
   <div id="main_page">
 
       <video
@@ -7,7 +8,7 @@
           v-if="this.videos.length>0"
           :src="getFileURL()"
           class="videoSource"
-          loop="loop" autoplay="autoplay" controls="controls"
+          loop="loop" autoplay="autoplay" controls="false"
           webkit-playsinline="true" x-webkit-airplay="true" playsInline={true} x5-playsinline="true" x5-video-orientation="portraint"
       >
       </video>
@@ -42,6 +43,7 @@
 <script>
 import axios from "axios";
 import {showToast} from "vant";
+import {showFailToast} from "vant/lib/toast/function-call";
 
 export default {
   name: 'Video',
@@ -50,12 +52,15 @@ export default {
   },
   data() {
     return {
+      total: 0,
       showAct: true,
       bubble_offset: {x: 20, y: 420},
       videos: [],
       nextToken: '',
       watchingVideoIdx: 0,
       limit: 5,
+      pingIntervalID: null,
+      pingID: 0,
     }
   },
   mounted(){
@@ -66,6 +71,33 @@ export default {
   },
   methods: {
 
+    switchPing:function() {
+      if(this.pingIntervalID) {
+        console.log("clearInterval")
+        clearInterval(this.pingIntervalID)
+        this.pingIntervalID = null
+      }else{
+        console.log("startPingTimer")
+        this.startPingTimer()
+      }
+    },
+
+    startPingTimer() {
+      this.pingIntervalID = setInterval(this.testPing, 1000)
+    },
+
+    stopPingTimer() {
+      if(this.pingIntervalID) {
+        clearInterval(this.pingIntervalID)
+      }
+    },
+
+    testPing: function() {
+      this.pingID++
+      var reqURL = this.getHost()+ "viewer/test_stream/" + this.pingID
+      axios.get(reqURL)
+    },
+
     switchShowOpt: function() {
       this.showAct = !this.showAct
     },
@@ -75,7 +107,7 @@ export default {
       if(!video){
         return
       }
-      return video.size+" "+video.name
+      return this.nextToken + "/" + this.total + " " + video.size+" "+video.name
     },
 
     getCurrentVideo: function() {
@@ -86,7 +118,7 @@ export default {
     },
 
     getHost: function() {
-      //return "http://127.0.0.1:9887/"
+      //return "http://192.168.50.47:9887/"
       return ""
     },
 
@@ -124,7 +156,7 @@ export default {
         resp.data.videos.forEach(v=>{
           this.videos.push({id: v.id, name: v.name, size:v.size})
         })
-
+        this.total = resp.data.total
         this.nextToken = resp.data.next_token
 
 
@@ -152,7 +184,9 @@ export default {
 
       console.log("["+action+"]"+reqURL)
       axios.get(reqURL).then(resp=>{
-
+        if(resp.data.err_msg){
+          showFailToast(resp.data.err_msg)
+        }
       })
 
       this.watchingVideoIdx++

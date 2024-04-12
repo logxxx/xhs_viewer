@@ -44,6 +44,7 @@ func (m *VideoMgr) PreloadVideos() error {
 	if len(videos) == 0 {
 		return errors.New("no video find")
 	}
+	log.Infof("VideoMgr.PreloadVideos get %v videos", len(videos))
 	m.Videos = videos
 	return nil
 }
@@ -59,7 +60,7 @@ func (m *VideoMgr) RemoveVideo(path string) {
 	log.Infof("!!!!!!!!!!!!!!remove video fAILED!!! path=%v", path)
 }
 
-func (m *VideoMgr) GetVideos(limit int, tokenStr string) (resp []string, nextToken string, err error) {
+func (m *VideoMgr) GetVideos(limit int, tokenStr string) (total int, resp []string, nextToken string, err error) {
 
 	defer func() {
 		log.Infof("GetVideos limit=%v token=%v total=%v return[len=%v next=%v err=%v]", limit, tokenStr, len(m.Videos), len(resp), nextToken, err)
@@ -74,6 +75,8 @@ func (m *VideoMgr) GetVideos(limit int, tokenStr string) (resp []string, nextTok
 		err = errors.New("no videos")
 		return
 	}
+
+	total = len(m.Videos)
 
 	lastIdx, _ := strconv.Atoi(tokenStr)
 
@@ -111,6 +114,19 @@ func findAllVideos(dir string, filterPath string) (videos []string, err error) {
 			return nil
 		}
 		if strings.HasPrefix(filePath, filterPath) {
+			return nil
+		}
+
+		/*
+			if fileInfo.Size() > 50*1024*1024 { //TOO LARGE
+				return nil
+			}
+
+		*/
+
+		if fileInfo.Size() < 1024*1024 {
+			log.Infof("findAllVideos video TOO SMALL, so REMOVE. size:%v path:%v", utils.GetShowSize(fileInfo.Size()), filePath)
+			os.Remove(filePath)
 			return nil
 		}
 		videos = append(videos, filePath)

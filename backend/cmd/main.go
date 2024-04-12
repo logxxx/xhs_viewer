@@ -8,6 +8,7 @@ import (
 	"github.com/logxxx/utils"
 	"github.com/logxxx/utils/fileutil"
 	"github.com/logxxx/utils/logger"
+	"github.com/logxxx/utils/randutil"
 	"github.com/logxxx/utils/reqresp"
 	"github.com/logxxx/utils/runutil"
 	log "github.com/sirupsen/logrus"
@@ -16,17 +17,22 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 var (
-	fromDir = flag.String("from_dir", "", "")
-	toDir   = flag.String("to_dir", "", "")
+	fromDir            = flag.String("from_dir", "", "")
+	toDir              = flag.String("to_dir", "", "")
+	repeatContentLarge = strings.Repeat("hello world", 1000000)
+	repeatContentSmall = strings.Repeat("hello world", 10000)
 )
 
 type GetVideosResp struct {
+	Total     int                 `json:"total"`
 	Videos    []GetVideosRespElem `json:"videos,omitempty"`
 	NextToken string              `json:"next_token,omitempty"`
+	Time      string              `json:"time"`
 }
 
 type GetVideosRespElem struct {
@@ -81,9 +87,14 @@ func main() {
 		}
 		log.Infof("handle act id=%v action=%v", reqID, reqAction)
 
+		var err error
 		if reqAction != "" {
 			dstDir := *toDir
-			err := fileutil.MoveFileToDir(utils.B64To(reqID), filepath.Join(dstDir, reqAction))
+			err = os.MkdirAll(filepath.Join(dstDir, reqAction), 0755)
+			if err != nil {
+				log.Errorf("MkdirAll err:%v dir:%v", err, filepath.Join(dstDir, reqAction))
+			}
+			err = fileutil.MoveFileToDir(utils.B64To(reqID), filepath.Join(dstDir, reqAction))
 			log.Infof("moveto:%v=>%v err:%v", utils.B64To(reqID), filepath.Join(dstDir, reqAction), err)
 			if err != nil {
 				runutil.GoRunSafe(func() {
@@ -101,6 +112,15 @@ func main() {
 
 		mgr.RemoveVideo(utils.B64To(reqID))
 
+		if err != nil {
+			if strings.Contains(err.Error(), "permission denied") {
+				reqresp.MakeErrMsg(c, errors.New("permission denied"))
+				return
+			}
+			reqresp.MakeErrMsg(c, err)
+			return
+		}
+
 		reqresp.MakeRespOk(c)
 	})
 
@@ -116,9 +136,10 @@ func main() {
 		vs := []string{}
 		var err error
 		var nextToken = ""
+		var total int
 		for i := 0; i < 1000; i++ {
 			roundVs := []string{}
-			roundVs, nextToken, err = mgr.GetVideos(limit, reqToken)
+			total, roundVs, nextToken, err = mgr.GetVideos(limit, reqToken)
 			if err != nil {
 				reqresp.MakeErrMsg(c, err)
 				return
@@ -132,7 +153,9 @@ func main() {
 		}
 
 		resp := GetVideosResp{
+			Total:     total,
 			NextToken: nextToken,
+			Time:      utils.FormatTimeSafe(time.Now()),
 		}
 		for _, v := range vs {
 			f, _ := os.Stat(v)
@@ -145,7 +168,18 @@ func main() {
 		reqresp.MakeResp(c, resp)
 	})
 
-	fileLimiter := map[string]int{}
+	g.GET("/viewer/test_stream/:id", func(c *gin.Context) {
+		streamIDStr := c.Param("id")
+		streamID, _ := strconv.Atoi(streamIDStr)
+		if streamID > 0 {
+			//time.Sleep(time.Second * time.Duration(streamID%10))
+		}
+		content := repeatContentSmall
+		if streamID%10 == 0 {
+			//content = repeatContentLarge
+		}
+		c.String(200, fmt.Sprintf("%v: %v", streamIDStr, randutil.RandStr(10)+content+randutil.RandStr(10)))
+	})
 	g.GET("/viewer/file", func(c *gin.Context) {
 
 		//X-Forwarded-For 和 X-Real-IP
@@ -161,39 +195,105 @@ func main() {
 
 		filePath := getFilePathByID(id)
 
-		if fileLimiter[filePath] > 20*1024*1024 {
+		if fileLimiterGet(filePath) > 20*1024*1024 {
 			//c.String(200, "")
 			//return
 		}
 
+		/*
+			f, err := os.Open(filePath)
+			if err != nil {
+				reqresp.MakeErrMsg(c, err)
+				return
+			}
+			io.Copy(c.Writer, f)
+
+			return
+
+		*/
+
 		c.File(filePath)
 
-		allTotal := 0
-		for _, s := range fileLimiter {
-			allTotal += s
-		}
-
-		log.Debugf("GetFile return:%v ALL:[count=%v total=%v] path:%v", utils.GetShowSize(int64(c.Writer.Size())), len(fileLimiter), utils.GetShowSize(int64(allTotal)), filePath)
-		fileLimiter[filePath] += c.Writer.Size()
+		allTotal := fileLimiterTotal()
+		//req: Range resp:Content-Range
+		log.Debugf("GetFile return:%v req_range=%v resp_range=%v ALL:[count=%v total=%v] path:%v",
+			utils.GetShowSize(int64(c.Writer.Size())),
+			getReqRangeSize(c.Request.Header.Get("Range")),
+			getRespRangeSize(c.Writer.Header().Get("Content-Range")),
+			fileLimiterLen(), utils.GetShowSize(int64(allTotal)), filePath)
+		fileLimiterAdd(filePath, c.Writer.Size())
+		log.Debugf("reqRange:%v=>%v", c.Request.Header.Get("Range"), getReqRangeSize(c.Request.Header.Get("Range")))
+		log.Debugf("respRange:%v=>%v", c.Writer.Header().Get("Content-Range"), getRespRangeSize(c.Writer.Header().Get("Content-Range")))
 		return
 
-		f, err := os.Open(filePath)
-		if err != nil {
-			reqresp.MakeErrMsg(c, err)
-			return
-		}
-		to := make([]byte, 10*1024*1024)
-		succ, _ := f.Read(to)
-		if succ > 0 {
-			to = to[:succ]
-		}
-		log.Debugf("GetFile return:%v path:%v", utils.GetShowSize(int64(len(to))), filePath)
-		c.Writer.Write(to)
+		/*
+			f, err := os.Open(filePath)
+			if err != nil {
+				reqresp.MakeErrMsg(c, err)
+				return
+			}
+			to := make([]byte, 10*1024*1024)
+			succ, _ := f.Read(to)
+			if succ > 0 {
+				to = to[:succ]
+			}
+			log.Debugf("GetFile return:%v path:%v", utils.GetShowSize(int64(len(to))), filePath)
+			c.Writer.Write(to)
+
+		*/
 
 	})
-	g.StaticFile("/", `D:\mytest\mywork\xhs_viewer\frontend\dist\index.html`)
-	g.StaticFS("/dist", gin.Dir(`D:\mytest\mywork\xhs_viewer\frontend\dist`, true))
+	//g.StaticFile("/", `../../frontend/dist/index.html`)
+	g.StaticFile("/", `/data/hehanyang/mytest/xhs_viewer/frontend/dist/index.html`)
+	//g.StaticFS("/dist", gin.Dir(`../../frontend/dist/`, true))
+	g.StaticFS("/dist", gin.Dir(`/data/hehanyang/mytest/xhs_viewer/frontend/dist/`, true))
 	g.Run(":9887")
+}
+
+var (
+	fileLimiter     = map[string]int{}
+	fileLimiterLock sync.Mutex
+)
+
+func fileLimiterTotal() (resp int) {
+	for _, v := range fileLimiter {
+		resp += v
+	}
+	return
+}
+
+func fileLimiterLen() int {
+	fileLimiterLock.Lock()
+	defer fileLimiterLock.Unlock()
+	return len(fileLimiter)
+}
+
+func fileLimiterGet(path string) int {
+	fileLimiterLock.Lock()
+	defer fileLimiterLock.Unlock()
+	return fileLimiter[path]
+}
+
+func fileLimiterAdd(path string, delta int) {
+	fileLimiterLock.Lock()
+	defer fileLimiterLock.Unlock()
+	fileLimiter[path] += delta
+}
+
+func getReqRangeSize(input string) string {
+	//bytes=xxxxxxx-
+	sizeStr := utils.Extract(input, "bytes=", "-")
+	size, _ := strconv.Atoi(sizeStr)
+	return utils.GetShowSize(int64(size)) + "-"
+}
+
+func getRespRangeSize(input string) string {
+	//bytes xxx-xxx/xxx
+	range1Str := utils.Extract(input, "bytes ", "-")
+	range2Str := utils.Extract(input, "/", "")
+	range1, _ := strconv.Atoi(range1Str)
+	range2, _ := strconv.Atoi(range2Str)
+	return utils.GetShowSize(int64(range1)) + "-" + utils.GetShowSize(int64(range2))
 }
 
 func getFilePathByID(id string) string {
