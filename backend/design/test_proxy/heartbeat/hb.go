@@ -3,6 +3,7 @@ package heartbeat
 import (
 	"encoding/binary"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 )
@@ -28,6 +29,16 @@ func NewHb() *Heartbeat {
 func NewHandler(conn net.Conn) *Handler {
 	resp := &Handler{conn: conn}
 	return resp
+}
+
+func (h *Handler) Auth(req *AuthData) error {
+	reqBytes := req.Bytes()
+	resp, err := h.Request(string(reqBytes), true)
+	if err != nil {
+		return err
+	}
+	log.Debugf("Handler.Auth resp:%v", resp)
+	return nil
 }
 
 func (h *Handler) Request(data string, waitForResp bool) (resp string, err error) {

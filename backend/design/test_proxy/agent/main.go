@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,12 @@ type Listener struct {
 	needConnChan chan int64
 	connChan     chan net.Conn
 	daemonConn   net.Conn
+	authData     *heartbeat.AuthData
+}
+
+func NewListener(authData *heartbeat.AuthData) *Listener {
+	listener := &Listener{connChan: make(chan net.Conn), needConnChan: make(chan int64), authData: authData}
+	return listener
 }
 
 func main() {
@@ -34,7 +41,12 @@ func main() {
 		panic("empty node addr")
 	}
 
-	listener := &Listener{connChan: make(chan net.Conn), needConnChan: make(chan int64)}
+	listener := NewListener(&heartbeat.AuthData{
+		UserID:        "",
+		DeviceID:      "",
+		Authorization: "",
+		Payload:       "",
+	})
 
 	go listener.runDaemonConn()
 
@@ -71,12 +83,13 @@ func (l *Listener) runDaemonConn() {
 
 		h := heartbeat.NewHandler(conn)
 
-		modeResp, err := h.Request("I_AM_DAEMON_CONN", true)
+		authData := l.authData.DeepCopy()
+		authData.Payload = "I_AM_DAEMON_CONN"
+		err = h.Auth(authData)
 		if err != nil {
-			log.Errorf("h.Request err:%v", err)
+			log.Errorf("h.Auth err:%v", err)
 			continue
 		}
-		log.Debugf("send msg I_AM_DAEMON_CONN to node, resp:%v", modeResp)
 
 		l.startDaemonConn(conn)
 
@@ -88,9 +101,9 @@ func (l *Listener) StartDial() {
 	round := 0
 
 	for {
-		<-l.needConnChan
+		dialID := <-l.needConnChan
 		round++
-		log.Debugf("dial conn start. round=%v nodeAddr=%v", round, *nodeAddr)
+		log.Debugf("dial conn start. dialID=%v round=%v nodeAddr=%v", dialID, round, *nodeAddr)
 		conn, err := net.Dial("tcp", *nodeAddr)
 		if err != nil {
 			log.Errorf("Dial err:%v", err)
@@ -99,10 +112,15 @@ func (l *Listener) StartDial() {
 		}
 		log.Debugf("dial succ. round=%v", round)
 
-		err = heartbeat.NewHb().SetData("GENERAL_CONN").Write(conn)
+		h := heartbeat.NewHandler(conn)
+		authData := l.authData.DeepCopy()
+		authData.Payload = "I_AM_GENERAL_CONN"
+		err = h.Auth(authData)
 		if err != nil {
-			log.Errorf("Write err:%v", err)
+			log.Errorf("h.Auth err:%v", err)
+			continue
 		}
+
 		l.connChan <- conn
 
 	}
@@ -129,9 +147,18 @@ func (l *Listener) startDaemonConn(conn net.Conn) {
 			continue
 		}
 
-		log.Debugf("sending need more chan...")
-		l.needConnChan <- 1
-		log.Debugf("sending need more chan succ!")
+		//	req := fmt.Sprintf("NEED_MORE:%v", dialID)
+
+		if strings.HasPrefix(hb.Data(), "NEED_MORE:") {
+			dialID, _ := strconv.ParseInt(strings.TrimPrefix(hb.Data(), "NEED_MORE:"), 10, 64)
+			log.Debugf("dial_id=%v sending need more chan...", dialID)
+			l.needConnChan <- dialID
+			log.Debugf("dial_id=%v sending need more chan succ!", dialID)
+			continue
+		}
+
+		log.Debugf("recv invalid data:%v", hb.Data())
+
 	}
 
 }
