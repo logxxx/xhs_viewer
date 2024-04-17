@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/heartbeat"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/heartbeat"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"

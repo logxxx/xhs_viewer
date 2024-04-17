@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/heartbeat"
-	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/utils"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/heartbeat"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/utils"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"time"

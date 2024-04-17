@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/heartbeat"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/heartbeat"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
@@ -42,10 +42,10 @@ func main() {
 	}
 
 	listener := NewListener(&heartbeat.AuthData{
-		UserID:        "",
-		DeviceID:      "",
-		Authorization: "",
-		Payload:       "",
+		UserID:        "test_user1",
+		DeviceID:      "device_id#123456",
+		Authorization: "auth eyjh123123",
+		Payload:       "payload hello world",
 	})
 
 	go listener.runDaemonConn()
