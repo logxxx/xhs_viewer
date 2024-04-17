@@ -34,7 +34,7 @@ func (f *MyLogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	}
 	sort.Strings(datas)
 
-	resp := fmt.Sprintf("%v[%v]%v|%v %v\n", entry.Time.Format("01/02 15:04:05"), level, pid, strings.Join(datas, "&"), entry.Message)
+	resp := fmt.Sprintf("%v[%v]%v %v > %v\n", entry.Time.Format("01/02 15:04:05"), level, pid, strings.Join(datas, "&"), entry.Message)
 
 	return []byte(resp), nil
 }

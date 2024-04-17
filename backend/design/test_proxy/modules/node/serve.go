@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/heartbeat"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/utils"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
@@ -83,11 +84,15 @@ func (node *Node) reverseProxy() *httputil.ReverseProxy {
 }
 
 func (node *Node) dialContext(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-	log.Debugf("dialContext waiting for conn")
+
+	logger := utils.Log(ctx, "Node.dialContext").WithField("net", network).WithField("addr", addr)
+
+	logger.Debugf("dialContext waiting for conn")
 	agentID, _, _ := net.SplitHostPort(addr)
 	if agentID == "" {
 		return nil, errors.New("empty agentID")
 	}
+	logger = logger.WithField("agent_id", agentID)
 
 	agent := node.GetAgent(agentID)
 
@@ -95,10 +100,13 @@ func (node *Node) dialContext(ctx context.Context, network, addr string) (conn n
 	for {
 		conn, err := agent.waitForNewConn()
 		if conn != nil {
+			logger.WithField("remote_addr", conn.RemoteAddr().String()).Debugf("dialContext waitForNewConn succ.")
 			return conn, nil
 		}
 		retryTimes++
+		logger = logger.WithField("retry_time", retryTimes)
 		if retryTimes >= 3 {
+			logger.Debugf("waitForNewConn TIMEOUT")
 			return nil, err
 		}
 
@@ -107,9 +115,13 @@ func (node *Node) dialContext(ctx context.Context, network, addr string) (conn n
 }
 
 func (agent *Agent) waitForNewConn() (net.Conn, error) {
+
+	logger := utils.Log(nil, "waitForNewConn")
+
 	select {
 	case newConn := <-agent.readyForWorkConnChan:
 		agent.acceptConnCount++
+		logger.WithField("remote_addr", newConn.RemoteAddr().String()).Debugf("recv chan directly")
 		return newConn, nil
 	default:
 	}
@@ -120,11 +132,9 @@ func (agent *Agent) waitForNewConn() (net.Conn, error) {
 	log.Debugf("dialContext send need more conn sig succ.waiting conn chan...")
 	select {
 	case conn := <-agent.readyForWorkConnChan:
-		if isConnHealthy(conn) {
-			log.Debugf("dialContext get conn start work")
-			agent.acceptConnCount++
-			return conn, nil
-		}
+		agent.acceptConnCount++
+		logger.WithField("remote_addr", conn.RemoteAddr().String()).Debugf("recv chan")
+		return conn, nil
 	case <-time.After(3 * time.Second):
 	}
 

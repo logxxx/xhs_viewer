@@ -83,7 +83,7 @@ func (a *Agent) DealConn(conn net.Conn, isDaemonConn bool) {
 	case <-timeoutTick.C:
 		logger.Debugf("recv a chan but TOO LONG no use")
 	case a.readyForWorkConnChan <- conn:
-		logger.Debugf("DealConn push conn to readyForWorkConnChan succ")
+		logger.Debugf("DealConn push conn to readyForWorkConnChan succ!")
 	}
 
 }
