@@ -33,6 +33,7 @@ func NewHandler(conn net.Conn) *Handler {
 
 func (h *Handler) Auth(req *AuthData) error {
 	reqBytes := req.Bytes()
+	//NOTE: for NODE, if you recv a AUTH msg and check it passed, you MUST REPLY ANY MSG!(e.g.OK)
 	resp, err := h.Request(string(reqBytes), true)
 	if err != nil {
 		return err
@@ -81,7 +82,9 @@ func Read(r io.Reader) (hb *Heartbeat, err error) {
 			}
 		}
 	default:
-		return nil, fmt.Errorf("invalid version:%v", hb.version)
+		err := fmt.Errorf("invalid version:%v", hb.version)
+		log.Errorf("heartbeat.Read err:%v data:%v", err, string(hb.data))
+		return nil, err
 	}
 	return hb, nil
 }
