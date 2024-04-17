@@ -116,6 +116,7 @@ func (l *Listener) StartDial() {
 			time.Sleep(5 * time.Second)
 			continue
 		}
+		logger = logger.WithField("local_addr", conn.LocalAddr().String())
 		logger.Debugf("dial succ")
 
 		h := heartbeat.NewHandler(conn)
