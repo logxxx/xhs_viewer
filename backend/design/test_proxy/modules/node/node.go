@@ -32,8 +32,14 @@ func (node *Node) StatForever() {
 	for {
 		time.Sleep(10 * time.Second)
 		node.agentID2AgentMapLock.Lock()
+		count := 0
 		for agentID, a := range node.agentID2AgentMap {
-			log.Debugf("[NODE_STAT]agentID:%v dialID:%v hasDaemon:%v counter[accept:%v dial:%v serve:%v]", agentID, a.DialID, a.daemonConn != nil, a.acceptConnCount, a.callDialApiCount, a.callDirectorApiCount)
+			count++
+			daemonAddr := "-"
+			if a.daemonConn != nil {
+				daemonAddr = a.daemonConn.RemoteAddr().String()
+			}
+			log.Debugf("[NODE_STAT %v/%v]agentID:%v daemonAddr:%v dialID:%v counter[accept:%v dial:%v serve:%v]", count, len(node.agentID2AgentMap), agentID, daemonAddr, a.DialID, a.acceptConnCount, a.callDialApiCount, a.callDirectorApiCount)
 		}
 		node.agentID2AgentMapLock.Unlock()
 	}
@@ -68,6 +74,11 @@ func (node *Node) StartAccept() {
 		}
 
 		//TODO: check auth
+		err = heartbeat.NewHb().SetData("OK").Write(conn)
+		if err != nil {
+			log.Errorf("Write OK err:%v", err)
+			continue
+		}
 
 		agent := node.GetAgent(authData.DeviceID)
 
