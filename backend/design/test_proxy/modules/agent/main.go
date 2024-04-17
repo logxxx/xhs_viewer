@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/heartbeat"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/utils"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
@@ -18,20 +20,22 @@ var (
 )
 
 type Listener struct {
-	needConnChan chan int64
-	connChan     chan net.Conn
-	daemonConn   net.Conn
-	authData     *heartbeat.AuthData
+	needConnChan         chan int64
+	readyForWorkConnChan chan net.Conn
+	daemonConn           net.Conn
+	authData             *heartbeat.AuthData
 }
 
 func NewListener(authData *heartbeat.AuthData) *Listener {
-	listener := &Listener{connChan: make(chan net.Conn), needConnChan: make(chan int64), authData: authData}
+	listener := &Listener{readyForWorkConnChan: make(chan net.Conn), needConnChan: make(chan int64), authData: authData}
 	return listener
 }
 
 func main() {
 
 	flag.Parse()
+
+	log.SetFormatter(&utils.MyLogFormatter{})
 
 	log.SetLevel(log.DebugLevel)
 
@@ -100,33 +104,39 @@ func (l *Listener) runDaemonConn() {
 func (l *Listener) StartDial() {
 	round := 0
 
+	logger := utils.Log(context.Background(), "Listener.StartDial")
 	for {
 		dialID := <-l.needConnChan
 		round++
-		log.Debugf("dial conn start. dialID=%v round=%v nodeAddr=%v", dialID, round, *nodeAddr)
+		logger = logger.WithField("dialID", dialID).WithField("round", round)
+		logger.Debugf("dial conn start")
 		conn, err := net.Dial("tcp", *nodeAddr)
 		if err != nil {
-			log.Errorf("Dial err:%v", err)
+			logger.Errorf("Dial err:%v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		log.Debugf("dial succ. round=%v", round)
+		logger.Debugf("dial succ")
 
 		h := heartbeat.NewHandler(conn)
 		authData := l.authData.DeepCopy()
 		authData.Payload = "I_AM_GENERAL_CONN"
 		err = h.Auth(authData)
 		if err != nil {
-			log.Errorf("h.Auth err:%v", err)
+			logger.Errorf("h.Auth err:%v", err)
 			continue
 		}
 
-		l.connChan <- conn
-
+		logger.Debugf("send to readyForWorkConnChan...")
+		l.readyForWorkConnChan <- conn
+		logger.Debugf("send to readyForWorkConnChan succ!")
 	}
 }
 
 func (l *Listener) startDaemonConn(conn net.Conn) {
+
+	logger := utils.Log(context.Background(), "Listener.startDaemonConn").WithField("local_addr", conn.LocalAddr())
+
 	l.daemonConn = conn
 	defer func() {
 		if l.daemonConn != nil {
@@ -138,12 +148,23 @@ func (l *Listener) startDaemonConn(conn net.Conn) {
 	for {
 		hb, err := heartbeat.Read(conn)
 		if err != nil {
+			logger.Errorf("Read err:%v", err)
 			return
 		}
 		log.Debugf("startDeamonConn recv hb:%v", hb.Data())
 
 		if hb.Data() == "KEEP_ALIVE" {
-			log.Debugf("recv KEEP_ALIVE msg")
+			logger.Debugf("recv KEEP_ALIVE msg")
+			continue
+		}
+
+		if hb.Data() == "PING" {
+			logger.Debugf("recv PING msg")
+			err = heartbeat.NewHb().SetData("OK").Write(conn)
+			if err != nil {
+				logger.Errorf("Write PING err:%v", err)
+				return
+			}
 			continue
 		}
 
@@ -164,7 +185,7 @@ func (l *Listener) startDaemonConn(conn net.Conn) {
 }
 
 func (l *Listener) Accept() (net.Conn, error) {
-	conn, ok := <-l.connChan
+	conn, ok := <-l.readyForWorkConnChan
 	if !ok {
 		log.Debugf("agent Accept conn failed!")
 	}
@@ -173,7 +194,7 @@ func (l *Listener) Accept() (net.Conn, error) {
 }
 
 func (l *Listener) Close() error {
-	close(l.connChan)
+	close(l.readyForWorkConnChan)
 	return nil
 }
 

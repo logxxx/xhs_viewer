@@ -108,7 +108,7 @@ func (node *Node) dialContext(ctx context.Context, network, addr string) (conn n
 
 func (agent *Agent) waitForNewConn() (net.Conn, error) {
 	select {
-	case newConn := <-agent.connChan:
+	case newConn := <-agent.readyForWorkConnChan:
 		if isConnHealthy(newConn) {
 			log.Debugf("dialContext get conn directly")
 			agent.acceptConnCount++
@@ -117,12 +117,12 @@ func (agent *Agent) waitForNewConn() (net.Conn, error) {
 	default:
 	}
 
-	dialID := atomic.AddInt64(&agent.dialID, 1)
+	dialID := atomic.AddInt64(&agent.DialID, 1)
 	log.Debugf("dialContext send need more conn sig...")
 	agent.needMoreConnChan <- dialID
 	log.Debugf("dialContext send need more conn sig succ.waiting conn chan...")
 	select {
-	case conn := <-agent.connChan:
+	case conn := <-agent.readyForWorkConnChan:
 		if isConnHealthy(conn) {
 			log.Debugf("dialContext get conn start work")
 			agent.acceptConnCount++

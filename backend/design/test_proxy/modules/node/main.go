@@ -1,11 +1,11 @@
 package main
 
 import (
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/utils"
 	goCache "github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"sync"
-	"time"
 )
 
 var (
@@ -22,11 +22,13 @@ type Node struct {
 
 func main() {
 
+	log.SetFormatter(&utils.MyLogFormatter{})
+
 	log.SetLevel(log.DebugLevel)
 
 	log.Debugf("NODE start.")
 
-	node := &Node{agentID2AgentMap: map[string]*Agent{}, cache: goCache.New(30*time.Minute, 1*time.Hour)}
+	node := NewNode()
 
 	go node.StartAccept()
 

@@ -15,11 +15,9 @@ type Agent struct {
 	ParentNode *Node
 	DialID     int64
 
-	connChan           chan net.Conn
-	daemonConn         net.Conn
-	needMoreConnChan   chan int64
-	daemonNeedMoreChan chan int64
-	dialID             int64
+	readyForWorkConnChan chan net.Conn
+	daemonConn           net.Conn
+	needMoreConnChan     chan int64
 
 	acceptConnCount      int
 	callDialApiCount     int
@@ -29,11 +27,11 @@ type Agent struct {
 // NewAgent NewAgent
 func NewAgent(node *Node, id string) *Agent {
 	resp := &Agent{
-		ParentNode:       node,
-		AgentID:          id,
-		DialID:           0,
-		connChan:         make(chan net.Conn),
-		needMoreConnChan: make(chan int64),
+		ParentNode:           node,
+		AgentID:              id,
+		DialID:               0,
+		readyForWorkConnChan: make(chan net.Conn),
+		needMoreConnChan:     make(chan int64),
 	}
 
 	go resp.reportForever()
@@ -56,29 +54,42 @@ func (a *Agent) watchForNeedMoreChan() {
 				continue
 			}
 			logger.Debugf("needMoreConnByDaemon failed.")
-			err := a.needMoreConnByMqtt(dialID)
-			if err != nil {
-				logger.Errorf("needMoreConnByMqtt err:%v", err)
-			} else {
-				logger.Debugf("needMoreConnByMqtt succ")
-			}
 		}
 	}
 }
 
-func (a *Agent) DealConn(conn net.Conn, authData *heartbeat.AuthData) {
-	if authData.Payload == "I_AM_DAEMON_CONN" {
+func (a *Agent) DealConn(conn net.Conn, isDaemonConn bool) {
+
+	logger := utils.Log(context.Background(), "DealConn").WithField("local_addr", conn.LocalAddr())
+
+	if isDaemonConn {
 		a.startDaemonConn(conn)
 		return
 	}
 
+	timeoutTick := time.NewTicker(5 * time.Minute)
+
+	keepAliveTick := time.NewTicker(30 * time.Second)
+
 	select {
-	case <-time.After(3 * time.Minute):
-		log.Debugf("recv a chan but TOO LONG no use")
-	case a.connChan <- conn:
-		log.Debugf("DealConn push conn to connChan succ")
+	case <-keepAliveTick.C:
+		err := keepAlive(conn)
+		if err != nil {
+			logger.Errorf("keepAlive failed:%v", err)
+			return
+		}
+		logger.Debugf("keepAlive succ")
+		keepAliveTick.Reset(30 * time.Second)
+	case <-timeoutTick.C:
+		logger.Debugf("recv a chan but TOO LONG no use")
+	case a.readyForWorkConnChan <- conn:
+		logger.Debugf("DealConn push conn to readyForWorkConnChan succ")
 	}
 
+}
+
+func keepAlive(conn net.Conn) error {
+	return heartbeat.NewHb().SetData("KEEP_ALIVE").Write(conn)
 }
 
 func (a *Agent) needMoreConnByMqtt(dialID int64) (err error) {
@@ -98,11 +109,15 @@ func (a *Agent) needMoreConnByMqtt(dialID int64) (err error) {
 
 func (a *Agent) needMoreConnByDaemon(dialID int64) (ok bool) {
 
+	logger := utils.Log(context.Background(), "needMoreConnByDaemon").WithField("dialID", dialID)
+
 	if a.daemonConn == nil {
+		logger.Debugf("failed: a.daemonConn == nil")
 		return
 	}
 
 	if !isConnHealthy(a.daemonConn) {
+		logger.Debugf("failed: isConnHealthy is false")
 		return
 	}
 
@@ -110,10 +125,10 @@ func (a *Agent) needMoreConnByDaemon(dialID int64) (ok bool) {
 	log.Debugf("startDaemonConn recv need more chan sig. so ask agent:%v", req)
 	_, err := heartbeat.NewHandler(a.daemonConn).Request(req, false)
 	if err != nil {
-		log.Debugf("startDaemonConn Request err:%v", err)
+		log.Debugf("Request err:%v", err)
 		return
 	}
-	log.Debugf("startDaemonConn send need more succ.")
+	log.Debugf("send need more succ.")
 
 	ok = true
 
@@ -129,15 +144,13 @@ func (a *Agent) startDaemonConn(conn net.Conn) {
 		return
 	}
 
-	h := heartbeat.NewHandler(conn)
-
 	//keep alive
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)
 
 			log.Debugf("startDaemonConn send keep alive msg...")
-			_, err := h.Request("KEEP_ALIVE", false)
+			err = keepAlive(conn)
 			if err == nil {
 				log.Debugf("startDaemonConn keep alive succ!")
 				a.daemonConn = conn

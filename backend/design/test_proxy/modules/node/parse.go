@@ -7,7 +7,9 @@ type ParseResult struct {
 }
 
 func ParsePath(reqURL *http.Request) ParseResult {
-	resp := ParseResult{}
+	resp := ParseResult{
+		DeviceID: "device_id#123456",
+	}
 
 	return resp
 }
