@@ -189,7 +189,7 @@ func (l *Listener) Accept() (net.Conn, error) {
 	if !ok {
 		log.Debugf("agent Accept conn failed!")
 	}
-	log.Debugf("agent Accept conn succ.")
+	log.WithField("local_addr", conn.LocalAddr().String()).Debugf("agent Accept conn succ.")
 	return conn, nil
 }
 

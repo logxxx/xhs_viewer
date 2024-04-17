@@ -109,11 +109,8 @@ func (node *Node) dialContext(ctx context.Context, network, addr string) (conn n
 func (agent *Agent) waitForNewConn() (net.Conn, error) {
 	select {
 	case newConn := <-agent.readyForWorkConnChan:
-		if isConnHealthy(newConn) {
-			log.Debugf("dialContext get conn directly")
-			agent.acceptConnCount++
-			return newConn, nil
-		}
+		agent.acceptConnCount++
+		return newConn, nil
 	default:
 	}
 

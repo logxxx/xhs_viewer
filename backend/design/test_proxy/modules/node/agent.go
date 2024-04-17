@@ -60,7 +60,7 @@ func (a *Agent) watchForNeedMoreChan() {
 
 func (a *Agent) DealConn(conn net.Conn, isDaemonConn bool) {
 
-	logger := utils.Log(context.Background(), "DealConn").WithField("local_addr", conn.LocalAddr())
+	logger := utils.Log(context.Background(), "DealConn").WithField("remote_addr", conn.RemoteAddr().String())
 
 	if isDaemonConn {
 		a.startDaemonConn(conn)
