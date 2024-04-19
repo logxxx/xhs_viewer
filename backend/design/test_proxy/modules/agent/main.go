@@ -16,7 +16,8 @@ import (
 var (
 	//nodeAddr = "58.221.37.228:5566"
 	//nodeAddr = "127.0.0.1:5566"
-	nodeAddr = flag.String("node_addr", "", "")
+	nodeAddr     = flag.String("node_addr", "", "")
+	flagDeviceID = flag.String("device_id", "", "")
 )
 
 type Listener struct {
@@ -45,9 +46,13 @@ func main() {
 		panic("empty node addr")
 	}
 
+	if *flagDeviceID == "" {
+		panic("empty device id")
+	}
+
 	listener := NewListener(&heartbeat.AuthData{
 		UserID:        "test_user1",
-		DeviceID:      "device_id#123456",
+		DeviceID:      *flagDeviceID,
 		Authorization: "auth eyjh123123",
 		Payload:       "payload hello world",
 	})
@@ -73,17 +78,19 @@ func main() {
 }
 
 func (l *Listener) runDaemonConn() {
+	logger := utils.Log(nil, "Listener.runDaemonConn")
 	round := 0
 	for {
 		round++
-		log.Debugf("runDaemonConn start dial. round=%v", round)
+		logger = logger.WithField("round", round)
+		logger.Debugf("runDaemonConn start dial")
 		conn, err := net.Dial("tcp", *nodeAddr)
 		if err != nil {
-			log.Errorf("Dial err:%v", err)
+			logger.Errorf("Dial err:%v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		log.Debugf("dial succ. round=%v", round)
+		logger.Debugf("dial succ")
 
 		h := heartbeat.NewHandler(conn)
 
@@ -91,7 +98,7 @@ func (l *Listener) runDaemonConn() {
 		authData.Payload = "I_AM_DAEMON_CONN"
 		err = h.Auth(authData)
 		if err != nil {
-			log.Errorf("h.Auth err:%v", err)
+			logger.Errorf("h.Auth err:%v", err)
 			continue
 		}
 
@@ -108,7 +115,7 @@ func (l *Listener) StartDial() {
 	for {
 		dialID := <-l.needConnChan
 		round++
-		logger = logger.WithField("dialID", dialID).WithField("round", round)
+		logger = logger.WithField("dialID", dialID).WithField("round", round).WithField("local_addr", "")
 		logger.Debugf("dial conn start")
 		conn, err := net.Dial("tcp", *nodeAddr)
 		if err != nil {
@@ -173,13 +180,13 @@ func (l *Listener) startDaemonConn(conn net.Conn) {
 
 		if strings.HasPrefix(hb.Data(), "NEED_MORE:") {
 			dialID, _ := strconv.ParseInt(strings.TrimPrefix(hb.Data(), "NEED_MORE:"), 10, 64)
-			log.Debugf("dial_id=%v sending need more chan...", dialID)
+			logger.Debugf("dial_id=%v sending need more chan...", dialID)
 			l.needConnChan <- dialID
-			log.Debugf("dial_id=%v sending need more chan succ!", dialID)
+			logger.Debugf("dial_id=%v sending need more chan succ!", dialID)
 			continue
 		}
 
-		log.Debugf("recv invalid data:%v", hb.Data())
+		logger.Debugf("recv invalid data:%v", hb.Data())
 
 	}
 

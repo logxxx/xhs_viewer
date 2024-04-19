@@ -2,7 +2,7 @@ package heartbeat
 
 import (
 	"encoding/json"
-	"io"
+	"net"
 )
 
 // AuthData first connect heartbeat data
@@ -42,8 +42,8 @@ func ParseAuthData(b []byte) (ad *AuthData, err error) {
 	return ad, err
 }
 
-func GetAuth(r io.Reader) (*AuthData, error) {
-	hb, err := Read(r)
+func GetAuth(conn net.Conn) (*AuthData, error) {
+	hb, err := Read(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -51,5 +51,11 @@ func GetAuth(r io.Reader) (*AuthData, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = NewHb().SetData("OK").Write(conn)
+	if err != nil {
+		return nil, err
+	}
+
 	return authData, nil
 }

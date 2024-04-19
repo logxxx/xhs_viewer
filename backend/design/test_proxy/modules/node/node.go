@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/heartbeat"
+	"github.com/logxxx/xhs_viewer/backend/design/test_proxy/modules/utils"
 	goCache "github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -52,33 +54,32 @@ func (node *Node) StartAccept() {
 		panic(err)
 	}
 
+	logger := utils.Log(context.Background(), "Node.StartAccept").WithField("tcpPort", tcpPort)
+
 	round := 0
 	for {
+		logger = logger.WithField("remote_addr", "")
 		round++
-		log.Debugf("Node Accepting...%v", round)
+		logger = logger.WithField("round", round)
+		logger.Debugf("Node Accepting...%v", round)
 
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Errorf("Accept err:%v", err)
+			logger.Errorf("Accept err:%v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		log.Debugf("a conn comein:%v", conn.RemoteAddr().String())
+		logger = logger.WithField("remote_addr", conn.RemoteAddr().String())
+		logger.Debugf("a conn comein")
 
 		//heartbeat.NewHb().SetData("NODE_SAY_HELLO").Write(conn)
 
 		authData, err := heartbeat.GetAuth(conn)
 		if err != nil {
-			log.Errorf("GetAuth err:%v", err)
+			logger.Errorf("GetAuth err:%v", err)
 			continue
 		}
-
-		//TODO: check auth
-		err = heartbeat.NewHb().SetData("OK").Write(conn)
-		if err != nil {
-			log.Errorf("Write OK err:%v", err)
-			continue
-		}
+		logger.Debugf("get authData:%+v", authData)
 
 		agent := node.GetAgent(authData.DeviceID)
 

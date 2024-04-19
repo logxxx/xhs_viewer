@@ -10,8 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -37,29 +35,21 @@ func (node *Node) reverseProxy() *httputil.ReverseProxy {
 	resp := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 
-			pathElems := strings.Split(req.URL.Path, "/")
-			if len(pathElems) <= 3 {
-				log.Debugf("err: len(pathElems) <= 3: %v", pathElems)
-				return
-			}
-
-			if pathElems[1] != routePrefix {
-				log.Debugf("pathElems[1] != routePrefix elem:%v prefix:%v", pathElems[1], routePrefix)
-				return
-			}
-
-			log.Debugf("before parse path, req.URL.Path:%v", req.URL.Path)
-			req.URL.Path = "/" + filepath.Join(pathElems[2:]...)
-			log.Debugf("after parse path, req.URL.Path:%v", req.URL.Path)
+			logger := utils.Log(nil, "reverseProxy.Director")
 
 			if req.URL.Scheme == "" {
 				req.URL.Scheme = "http"
 			}
 
-			parseResult := ParsePath(req)
+			parseResult, err := ParsePath(req)
+			if err != nil {
+				logger.Debugf("ParsePath err:%v", err)
+				return
+			}
+			logger.Debugf("parseResult:%+v", parseResult)
 
 			if parseResult.DeviceID == "" {
-				log.Debugf("ParsePath empty devic_id")
+				logger.Debugf("ParsePath empty devic_id")
 				return
 			}
 
@@ -67,7 +57,7 @@ func (node *Node) reverseProxy() *httputil.ReverseProxy {
 
 			req.URL.Host = agent.AgentID //透传给dial用
 
-			log.Debugf("reverseProxy.Director reqUrl:%v", req.URL.String())
+			logger.Debugf("reverseProxy.Director reqUrl:%v", req.URL.String())
 		},
 		Transport: &http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
