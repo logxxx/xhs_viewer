@@ -1,6 +1,6 @@
 <template>
   <van-config-provider theme="dark">
-  <van-button style="position:absolute;z-index: 999" @click="switchPing">PING</van-button>
+  <!--<van-button style="position:absolute;z-index: 999" @click="switchPing">PING</van-button>-->
   <div id="main_page">
 
       <video
@@ -13,22 +13,24 @@
       >
       </video>
 
-    <van-floating-bubble type="" v-model:offset="bubble_offset" icon="eye" @click='switchShowOpt' />
+    <van-floating-bubble type="" v-model:offset="show_btn_offset" icon="eye" @click='switchShowOpt' />
+
+    <van-floating-bubble v-model:offset="delete_btn_offset" icon="delete"  @click='doAction("delete")'/>
 
     <div v-show="showAct" style="position:absolute;bottom:50px;display:flex;">
       <van-space direction="vertical" fill style="margin:0 10px">
         <van-button class="btn" type="success" @click='doAction("richang")'>日常</van-button>
         <van-button class="btn" type="warning" @click='doAction("best")'>绝了</van-button>
         <van-button class="btn" type="primary" @click='doAction("good")'>不错</van-button>
-        <van-button class="btn" type="" @click='doAction("normal")'>普通</van-button>
+        <van-button class="btn" type="" @click='doAction("normal")'>还行</van-button>
         <van-button class="btn" icon="arrow-double-right" type="primary" round @click="speedup"></van-button>
       </van-space>
       <van-space direction="vertical" fill style="">
-        <van-button class="btn" type="" @click='doAction("fabu")'>发布</van-button>
         <van-button class="btn" type="" @click='doAction("other")'>其他</van-button>
+        <van-button class="btn" type="" @click='doAction("fabu_putong")'>发普</van-button>
+        <van-button class="btn" type="warning" @click='doAction("fabu_nv")'>发女</van-button>
         <van-button class="btn" type="primary" @click='doAction("mine")'>我看</van-button>
         <van-button class="btn" type="success" @click='doAction("foot")'>海底</van-button>
-        <van-button class="btn" type="warning" @click='doAction("delete")'>删除</van-button>
       </van-space>
       <div style="display:flex;flex-direction:column-reverse; margin:0 10px ">
         <div style="color:white;background-color:black;">
@@ -54,7 +56,8 @@ export default {
     return {
       total: 0,
       showAct: true,
-      bubble_offset: {x: 20, y: 420},
+      show_btn_offset: {x: 20, y: 420},
+      delete_btn_offset: {x: 20, y: 300},
       videos: [],
       nextToken: '',
       watchingVideoIdx: 0,
@@ -232,6 +235,14 @@ export default {
 
 .btn{
   width:100px;
+}
+
+.btn_del {
+  width:200px;
+  position: absolute;
+  z-index: 999;
+  right: 80px;
+  bottom: 80px;
 }
 
 </style>

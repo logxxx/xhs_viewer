@@ -126,7 +126,7 @@ func findAllVideos(dir string, filterPath string) (videos []string, err error) {
 
 		if fileInfo.Size() < 1024*1024 {
 			log.Infof("findAllVideos video TOO SMALL, so REMOVE. size:%v path:%v", utils.GetShowSize(fileInfo.Size()), filePath)
-			os.Remove(filePath)
+			//os.Remove(filePath)
 			return nil
 		}
 		videos = append(videos, filePath)

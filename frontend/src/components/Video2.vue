@@ -23,7 +23,7 @@
   <van-tabbar id="tabbar" @change="onChangeTabbar">
     <van-tabbar-item icon=""></van-tabbar-item>
     <van-tabbar-item icon="delete-o">删除</van-tabbar-item>
-    <van-tabbar-item icon="home-o">普通</van-tabbar-item>
+    <van-tabbar-item icon="home-o">还行</van-tabbar-item>
     <van-tabbar-item icon="like-o">绝了</van-tabbar-item>
     <van-tabbar-item icon="eye-o">我看</van-tabbar-item>
     <van-tabbar-item icon="friends-o">其他</van-tabbar-item>
