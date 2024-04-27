@@ -74,9 +74,10 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 		vs := []string{}
 		var err error
 		var nextToken = ""
+		var total = 0
 		for i := 0; i < 1000; i++ {
 			roundVs := []string{}
-			roundVs, nextToken, err = mgr.GetVideos(limit, reqToken)
+			total, roundVs, nextToken, err = mgr.GetVideos(limit, reqToken)
 			if err != nil {
 				reqresp.MakeErrMsg(c, err)
 				return
@@ -91,6 +92,7 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 
 		resp := GetVideosResp{
 			NextToken: nextToken,
+			Total:     total,
 		}
 		for _, v := range vs {
 			f, _ := os.Stat(v)
