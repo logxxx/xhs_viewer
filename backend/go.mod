@@ -4,11 +4,12 @@ go 1.20
 
 require (
 	github.com/gin-gonic/gin v1.9.1
-	github.com/logxxx/utils v1.0.65
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
+
+require github.com/logxxx/utils v1.0.67
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

@@ -10,21 +10,30 @@ import (
 	"strings"
 )
 
+var (
+	enoughVideoCount = errors.New("enough video count")
+)
+
 type VideoMgr struct {
-	FromDir string
-	ToDir   string
-	Videos  []string
+	FromDirs []string
+	ToDir    string
+	Videos   []string
+	MaxCount int
 }
 
-func NewVideoMgr(from, to string) *VideoMgr {
+func NewVideoMgr(from []string, to string, maxCount int) *VideoMgr {
 
-	if from == to {
-		panic("from dir and to dir cannot totally same!")
+	if maxCount <= 0 {
+		maxCount = 1000
+	}
+	if maxCount >= 10000 {
+		maxCount = 1000
 	}
 
 	resp := &VideoMgr{
-		FromDir: from,
-		ToDir:   to,
+		FromDirs: from,
+		ToDir:    to,
+		MaxCount: maxCount,
 	}
 
 	RunBinlog()
@@ -37,8 +46,9 @@ func NewVideoMgr(from, to string) *VideoMgr {
 }
 
 func (m *VideoMgr) PreloadVideos() error {
-	videos, err := findAllVideos(m.FromDir, m.ToDir)
-	if err != nil {
+
+	videos, err := findAllVideos(m.FromDirs, m.ToDir, m.MaxCount)
+	if err != nil && err != enoughVideoCount {
 		return err
 	}
 	if len(videos) == 0 {
@@ -103,37 +113,33 @@ func (m *VideoMgr) GetVideos(limit int, tokenStr string) (total int, resp []stri
 }
 
 // 预加载视频
-func findAllVideos(dir string, filterPath string) (videos []string, err error) {
+func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []string, err error) {
 
-	err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
+	currCount := 0
+	for _, dir := range dirs {
+		err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
 
-		if !fileutil.IsVideo(fileInfo.Name()) {
-			return nil
-		}
-		if filePath == "" {
-			return nil
-		}
-		if strings.HasPrefix(filePath, filterPath) {
-			return nil
-		}
-
-		/*
-			if fileInfo.Size() > 50*1024*1024 { //TOO LARGE
-				return nil
+			if currCount >= maxCount {
+				return enoughVideoCount
 			}
 
-		*/
-
-		if fileInfo.Size() < 1024*1024 {
-			log.Infof("findAllVideos video TOO SMALL, so REMOVE. size:%v path:%v", utils.GetShowSize(fileInfo.Size()), filePath)
-			//os.Remove(filePath)
+			if !fileutil.IsVideo(fileInfo.Name()) {
+				return nil
+			}
+			if filePath == "" {
+				return nil
+			}
+			if strings.HasPrefix(filePath, filterPath) {
+				return nil
+			}
+			videos = append(videos, filePath)
+			currCount++
 			return nil
+		})
+		if err != nil {
+			return
 		}
-		videos = append(videos, filePath)
-		return nil
-	})
-	if err != nil {
-		return
 	}
+
 	return
 }
