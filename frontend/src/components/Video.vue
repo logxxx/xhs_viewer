@@ -15,6 +15,9 @@
 
     <van-floating-bubble type="" v-model:offset="show_btn_offset" icon="eye" @click='switchShowOpt' />
 
+    <van-floating-bubble v-model:offset="reload_btn_offset" icon="arrow-double-right"  @click='doReload'/>
+    <van-floating-bubble v-model:offset="preview_btn_offset" icon="arrow-left"  @click='this.isPreview = !this.isPreview'/>
+
     <van-floating-bubble v-model:offset="delete_btn_offset" icon="delete"  @click='doAction("delete")'/>
 
     <div v-show="showAct" style="position:absolute;bottom:50px;display:flex;">
@@ -58,12 +61,15 @@ export default {
       showAct: true,
       show_btn_offset: {x: 20, y: 420},
       delete_btn_offset: {x: 20, y: 300},
+      reload_btn_offset: {x: 20, y: 20},
+      preview_btn_offset: {x: 350, y:20},
       videos: [],
       nextToken: '',
       watchingVideoIdx: 0,
       limit: 5,
       pingIntervalID: null,
       pingID: 0,
+      isPreview: true,
     }
   },
   mounted(){
@@ -130,7 +136,7 @@ export default {
       if(!video){
         return
       }
-      var resp= this.getHost()+"viewer/file?name="+video.name+"&id="+video.id
+      var resp= this.getHost()+"viewer/file?name="+video.name+"&id="+video.id + "&is_preview=" + this.isPreview
       console.log("getFileURL resp:", resp)
       return resp
     },
@@ -167,6 +173,17 @@ export default {
         showToast("get videos catch err:"+err)
         console.log("get videos catch err:",err)
       })
+    },
+
+    doReload: function(){
+      this.apiReload()
+      this.nextToken = ""
+      this.getVideos()
+    },
+
+    apiReload: function() {
+      let reqURL = this.getHost()+"viewer/reload_video"
+      axios.get(reqURL)
     },
 
     doAction: function(action){

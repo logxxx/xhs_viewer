@@ -12,31 +12,44 @@ import (
 var thumbDirs = []string{}
 
 func main() {
+
+	log.SetLevel(log.InfoLevel)
+
 	rootDir := "H:/output_xhs"
 	dirs, err := os.ReadDir(rootDir)
 	if err != nil {
 		panic(err)
 	}
 	for _, dir := range dirs {
+
 		videoDir := filepath.Join(rootDir, dir.Name(), "视频")
+
+		log.Infof("dir:%v", videoDir)
 
 		fileutil.ScanFiles(videoDir, func(filePath string, fileInfo os.FileInfo) (err error) {
 			if !utils.HasFile(filePath) {
 				return
 			}
-			if utils.HasFile(filePath + ".thumb.mp4") {
-				return
-			}
+
 			if !fileutil.IsVideo(filePath) {
 				return
 			}
-			if fileInfo.Size() < 5*1024*1024 {
+			if fileInfo.Size() < 3*1024*1024 {
 				return
 			}
 
+			if utils.HasFile(filePath + ".thumb.mp4") {
+				return
+			}
+			if utils.GetFileSize(filePath+".thumb.mp4") > 0 {
+				return
+			}
+			os.Remove(filePath + ".thumb.mp4")
+
 			err1 := makeThumb(filePath)
 			if err1 != nil {
-				log.Errorf("make thumb err:%v filePath:%v", err, filePath)
+				log.Errorf("make thumb err:%v filePath:%v", err1, filePath)
+				os.Remove(filePath + ".thumb.mp4")
 				return
 			}
 
@@ -46,7 +59,7 @@ func main() {
 				return
 			}
 
-			log.Infof("make thumb:%v size before:%v after:%v", filePath, utils.GetShowSize(fileInfo.Size()), utils.GetShowSize(f.Size()))
+			log.Infof("make thumbsize before:%v after:%v path:%v", utils.GetShowSize(fileInfo.Size()), utils.GetShowSize(f.Size()), filePath)
 
 			return
 		})

@@ -21,7 +21,8 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 		c.String(200, fmt.Sprintf("pong %v", utils.FormatTimeSafe(time.Now())))
 	})
 
-	g.GET("/reload_video", func(c *gin.Context) {
+	g.GET("/viewer/reload_video", func(c *gin.Context) {
+		log.Infof("reload video!")
 		mgr.PreloadVideos()
 		reqresp.MakeRespOk(c)
 	})
@@ -82,7 +83,13 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 				reqresp.MakeErrMsg(c, err)
 				return
 			}
-			vs = append(vs, roundVs...)
+			for _, roundV := range roundVs {
+				if !utils.HasFile(roundV) {
+					continue
+				}
+				vs = append(vs, roundV)
+			}
+
 			if nextToken != "" && len(vs) >= limit {
 				break
 			}
@@ -96,9 +103,12 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 		}
 		for _, v := range vs {
 			f, _ := os.Stat(v)
+			if f == nil {
+				continue
+			}
 			resp.Videos = append(resp.Videos, GetVideosRespElem{
 				ID:   utils.B64(v),
-				Name: filepath.Base(v),
+				Name: filepath.Base(strings.ReplaceAll(v, "#", "%23")),
 				Size: utils.GetShowSize(f.Size()),
 			})
 		}
@@ -112,6 +122,7 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 
 		id := c.Query("id")
 		//log.Infof("get file:%v", id)
+		isPreview := c.Query("is_preview")
 
 		if id == "" {
 			reqresp.MakeErrMsg(c, errors.New("empty id"))
@@ -120,9 +131,11 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 
 		filePath := getFilePathByID(id)
 
-		if utils.HasFile(filePath + ".thumb.mp4") {
+		if isPreview == "true" && utils.HasFile(filePath+".thumb.mp4") {
+			log.Infof("return thumb video:%v", filePath+".thumb.mp4")
 			c.File(filePath + ".thumb.mp4")
 		} else {
+			log.Infof("return real video:%v", filePath)
 			c.File(filePath)
 		}
 

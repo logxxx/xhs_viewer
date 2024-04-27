@@ -119,6 +119,10 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 	for _, dir := range dirs {
 		err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
 
+			if strings.HasSuffix(filePath, "thumb.mp4") {
+				return nil
+			}
+
 			if currCount >= maxCount {
 				return enoughVideoCount
 			}
@@ -134,6 +138,7 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 			}
 			videos = append(videos, filePath)
 			currCount++
+			log.Debugf("add video:%v", filePath)
 			return nil
 		})
 		if err != nil {
