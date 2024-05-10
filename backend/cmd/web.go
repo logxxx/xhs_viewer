@@ -40,6 +40,10 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 		filePath := utils.B64To(reqID)
 
 		if reqAction != "" {
+			if reqAction == "delete" {
+				//fileutil.WriteToFile([]byte("0"), filePath)
+			}
+
 			dstDir := *toDir
 			err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
 			log.Infof("moveto:%v=>%v err:%v", filePath, filepath.Join(dstDir, reqAction), err)
@@ -51,6 +55,7 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 					if err != nil && strings.Contains(err.Error(), "used") {
 						AddToErrBinlog(filePath, filepath.Join(dstDir, reqAction), err)
 					} else {
+
 						log.Infof("no need add to binlog")
 					}
 				})
@@ -131,7 +136,7 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 
 		filePath := getFilePathByID(id)
 
-		if isPreview == "true" && utils.HasFile(filePath+".thumb.mp4") {
+		if isPreview == "true" && utils.GetFileSize(filePath+".thumb.mp4") > 10*1024 {
 			log.Infof("return thumb video:%v", filePath+".thumb.mp4")
 			c.File(filePath + ".thumb.mp4")
 		} else {

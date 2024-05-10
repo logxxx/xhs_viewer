@@ -6,6 +6,7 @@ import (
 	"github.com/logxxx/utils/fileutil"
 	log "github.com/sirupsen/logrus"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -115,6 +116,13 @@ func (m *VideoMgr) GetVideos(limit int, tokenStr string) (total int, resp []stri
 // 预加载视频
 func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []string, err error) {
 
+	type VideoWithSize struct {
+		Path string
+		Size int64
+	}
+
+	vs := []VideoWithSize{}
+
 	currCount := 0
 	for _, dir := range dirs {
 		err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
@@ -127,6 +135,10 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 				return enoughVideoCount
 			}
 
+			if fileInfo.Size() <= 20*1024*1024 {
+				return nil
+			}
+
 			if !fileutil.IsVideo(fileInfo.Name()) {
 				return nil
 			}
@@ -136,15 +148,32 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 			if strings.HasPrefix(filePath, filterPath) {
 				return nil
 			}
-			videos = append(videos, filePath)
+			vs = append(vs, VideoWithSize{
+				Path: filePath,
+				Size: fileInfo.Size(),
+			})
 			currCount++
 			log.Debugf("add video:%v", filePath)
 			return nil
 		})
-		if err != nil {
+		if err != nil && err != enoughVideoCount {
+			log.Errorf("ScanFiles err:%v", err)
 			return
 		}
 	}
+
+	log.Infof("get %v videos", len(vs))
+
+	sort.Slice(vs, func(i, j int) bool {
+		return vs[i].Size > vs[j].Size
+	})
+
+	resp := []string{}
+	for _, v := range vs {
+		resp = append(resp, v.Path)
+	}
+
+	videos = resp
 
 	return
 }

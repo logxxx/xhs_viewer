@@ -62,7 +62,7 @@ export default {
       show_btn_offset: {x: 20, y: 420},
       delete_btn_offset: {x: 20, y: 300},
       reload_btn_offset: {x: 20, y: 20},
-      preview_btn_offset: {x: 350, y:20},
+      preview_btn_offset: {x: 20, y:150},
       videos: [],
       nextToken: '',
       watchingVideoIdx: 0,

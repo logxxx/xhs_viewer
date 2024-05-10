@@ -15,18 +15,22 @@ func main() {
 
 	log.SetLevel(log.InfoLevel)
 
-	rootDir := "H:/output_xhs"
+	//rootDir := "H:/output_xhs"
+	rootDir := "G:\\weibo_download\\date"
 	dirs, err := os.ReadDir(rootDir)
 	if err != nil {
 		panic(err)
 	}
+
 	for _, dir := range dirs {
 
-		videoDir := filepath.Join(rootDir, dir.Name(), "视频")
+		//videoDir := filepath.Join(rootDir, dir.Name(), "视频")
+		videoDir := filepath.Join(rootDir, dir.Name())
 
 		log.Infof("dir:%v", videoDir)
 
 		fileutil.ScanFiles(videoDir, func(filePath string, fileInfo os.FileInfo) (err error) {
+
 			if !utils.HasFile(filePath) {
 				return
 			}
@@ -34,13 +38,25 @@ func main() {
 			if !fileutil.IsVideo(filePath) {
 				return
 			}
-			if fileInfo.Size() < 3*1024*1024 {
+
+			/*
+				newName, hit := fileutil.ReplaceInvalidChar(filePath, "RANDOM")
+				if hit {
+					count++
+					log.Printf("RENAME%v: %v => %v", count, filePath, newName)
+					err = os.Rename(filePath, newName)
+					if err != nil {
+						panic(err)
+					}
+				}
+
+				return
+			*/
+
+			if fileInfo.Size() < 5*1024*1024 {
 				return
 			}
 
-			if utils.HasFile(filePath + ".thumb.mp4") {
-				return
-			}
 			if utils.GetFileSize(filePath+".thumb.mp4") > 0 {
 				return
 			}
