@@ -13,23 +13,14 @@ import (
 )
 
 var (
-	flagFromDirs = flag.String("from_dirs", "", "")
-	toDir        = flag.String("to_dir", "", "")
-	maxCount     = flag.Int("max_count", 1000, "")
+	flagVideoFromDirs = flag.String("video_from_dirs", "", "")
+	flagVideoToDir    = flag.String("video_to_dir", "", "")
+	flagVideoMaxCount = flag.Int("video_max_count", 1000, "")
+
+	flagImageFromDir  = flag.String("image_from_dir", "", "")
+	flagImageToDir    = flag.String("image_to_dir", "", "")
+	flagImageMaxCount = flag.Int("image_max_count", 1000, "")
 )
-
-type GetVideosResp struct {
-	Total     int                 `json:"total"`
-	Videos    []GetVideosRespElem `json:"videos,omitempty"`
-	NextToken string              `json:"next_token,omitempty"`
-	Time      string              `json:"time"`
-}
-
-type GetVideosRespElem struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
-	Size string `json:"size,omitempty"`
-}
 
 func main() {
 
@@ -50,25 +41,14 @@ func main() {
 	log.Infof("wd:%v", wd)
 	flag.Parse()
 
-	if *flagFromDirs == "" {
-		panic("empty from dir")
-	}
+	videoFromDirs := strings.Split(*flagVideoFromDirs, ",")
 
-	fromDirs := strings.Split(*flagFromDirs, ",")
-	if len(fromDirs) == 0 {
-		panic("empty from dirs")
-	}
-
-	if *toDir == "" {
-		panic("empty to dir")
-	}
-
-	mgr := NewVideoMgr(fromDirs, *toDir, *maxCount)
+	InitMgr(videoFromDirs, *flagVideoToDir, *flagImageFromDir, *flagImageToDir)
 
 	g := gin.New()
 	g.Use(reqresp.Cors())
 
-	initWeb(g, mgr)
+	initWeb(g)
 	g.Run(":9887")
 }
 

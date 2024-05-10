@@ -16,10 +16,12 @@ import (
 	"time"
 )
 
-func initWeb(g *gin.Engine, mgr *VideoMgr) {
+func initWeb(g *gin.Engine) {
 	g.GET("/ping", func(c *gin.Context) {
 		c.String(200, fmt.Sprintf("pong %v", utils.FormatTimeSafe(time.Now())))
 	})
+
+	mgr := GetVideoMgr()
 
 	g.GET("/viewer/reload_video", func(c *gin.Context) {
 		log.Infof("reload video!")
@@ -44,7 +46,7 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 				//fileutil.WriteToFile([]byte("0"), filePath)
 			}
 
-			dstDir := *toDir
+			dstDir := *flagVideoToDir
 			err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
 			log.Infof("moveto:%v=>%v err:%v", filePath, filepath.Join(dstDir, reqAction), err)
 			if err != nil {
@@ -66,6 +68,60 @@ func initWeb(g *gin.Engine, mgr *VideoMgr) {
 		os.Remove(filePath + ".thumb.mp4")
 
 		reqresp.MakeRespOk(c)
+	})
+
+	g.GET("/viewer/images", func(c *gin.Context) {
+
+		reqLimit := c.Query("limit")
+		reqToken := c.Query("next_token")
+		limit, _ := strconv.Atoi(reqLimit)
+		if limit <= 0 {
+			limit = 10
+		}
+
+		iss := [][]string{}
+		var err error
+		var nextToken = ""
+		var total = 0
+		for i := 0; i < 1000; i++ {
+			roundIs := [][]string{}
+			total, roundIs, nextToken, err = GetImgMgr().GetImages(limit, reqToken)
+			if err != nil {
+				reqresp.MakeErrMsg(c, err)
+				return
+			}
+			for _, roundV := range roundIs {
+
+				iss = append(iss, roundV)
+			}
+
+			if nextToken != "" && len(iss) >= limit {
+				break
+			}
+			reqToken = nextToken
+			limit -= len(iss)
+		}
+
+		resp := GetImagesResp{
+			NextToken: nextToken,
+			Total:     total,
+		}
+		for _, is := range iss {
+			respElem := GetImagesRespElem{}
+			for _, i := range is {
+				f, _ := os.Stat(i)
+				if f == nil {
+					continue
+				}
+				respElem.Elems = append(respElem.Elems, GetImagesRespElemElem{
+					ID:   utils.B64(i),
+					Name: filepath.Base(strings.ReplaceAll(i, "#", "%23")),
+					Size: utils.GetShowSize(f.Size()),
+				})
+			}
+			resp.Images = append(resp.Images, respElem)
+		}
+		reqresp.MakeResp(c, resp)
 	})
 
 	g.GET("/viewer/videos", func(c *gin.Context) {

@@ -5,6 +5,7 @@ import (
 	"github.com/logxxx/utils"
 	"github.com/logxxx/utils/fileutil"
 	log "github.com/sirupsen/logrus"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -12,7 +13,11 @@ import (
 )
 
 var (
-	enoughVideoCount = errors.New("enough video count")
+	ErrEnoughCount = errors.New("enough count")
+
+	videoMgr *VideoMgr
+
+	imgMgr *ImageMgr
 )
 
 type VideoMgr struct {
@@ -20,6 +25,19 @@ type VideoMgr struct {
 	ToDir    string
 	Videos   []string
 	MaxCount int
+}
+
+func InitMgr(vFromDirs []string, vToDir, iFromDir, iToDir string) {
+	videoMgr = NewVideoMgr(vFromDirs, vToDir, 1000)
+	imgMgr = NewImageMgr(iFromDir, iToDir, 1000)
+}
+
+func GetVideoMgr() *VideoMgr {
+	return videoMgr
+}
+
+func GetImgMgr() *ImageMgr {
+	return imgMgr
 }
 
 func NewVideoMgr(from []string, to string, maxCount int) *VideoMgr {
@@ -41,7 +59,7 @@ func NewVideoMgr(from []string, to string, maxCount int) *VideoMgr {
 
 	err := resp.PreloadVideos()
 	if err != nil {
-		panic(err)
+		log.Errorf("PreloadVideos err:%v", err)
 	}
 	return resp
 }
@@ -49,7 +67,7 @@ func NewVideoMgr(from []string, to string, maxCount int) *VideoMgr {
 func (m *VideoMgr) PreloadVideos() error {
 
 	videos, err := findAllVideos(m.FromDirs, m.ToDir, m.MaxCount)
-	if err != nil && err != enoughVideoCount {
+	if err != nil && err != ErrEnoughCount {
 		return err
 	}
 	if len(videos) == 0 {
@@ -132,7 +150,7 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 			}
 
 			if currCount >= maxCount {
-				return enoughVideoCount
+				return ErrEnoughCount
 			}
 
 			if fileInfo.Size() <= 20*1024*1024 {
@@ -156,7 +174,7 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 			log.Debugf("add video:%v", filePath)
 			return nil
 		})
-		if err != nil && err != enoughVideoCount {
+		if err != nil && err != ErrEnoughCount {
 			log.Errorf("ScanFiles err:%v", err)
 			return
 		}
@@ -174,6 +192,157 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 	}
 
 	videos = resp
+
+	return
+}
+
+func GetImageExt(input string) string {
+	all := []string{".bmp", ".jpg", ".png", ".tif", ".gif", ".pcx", ".tga", ".exif", ".fpx", ".svg", ".psd", ".cdr", ".pcd", ".dxf", ".ufo", ".eps", ".ai", ".raw", ".WMF", ".webp", ".avif", ".apng"}
+	for _, elem := range all {
+		if strings.HasSuffix(input, elem) {
+			return elem
+		}
+	}
+	return ""
+}
+
+type ImageMgr struct {
+	FromDir  string
+	ToDir    string
+	Images   [][]string
+	MaxCount int
+}
+
+func NewImageMgr(from, to string, maxCount int) *ImageMgr {
+	if from == to {
+		panic("from dir and to dir cannot totally same!")
+	}
+
+	resp := &ImageMgr{
+		FromDir:  from,
+		ToDir:    to,
+		MaxCount: 1000,
+	}
+
+	err := resp.PreloadImages()
+	if err != nil {
+		panic(err)
+	}
+	return resp
+
+}
+
+func (m *ImageMgr) PreloadImages() error {
+	imgs, err := findAllImages(m.FromDir, m.ToDir, m.MaxCount)
+	if err != nil && err != ErrEnoughCount {
+		return err
+	}
+	if len(imgs) == 0 {
+		return errors.New("no img find")
+	}
+	log.Infof("ImageMgr.PreloadImages get %v imgs", len(imgs))
+	for _, elem := range imgs {
+		m.Images = append(m.Images, elem)
+	}
+
+	return nil
+}
+
+// 预加载视频
+func findAllImages(dir string, filterPath string, maxCount int) (images [][]string, err error) {
+
+	modTime2Imgs := map[int64][]string{}
+
+	count := 0
+	err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
+
+		ext := GetImageExt(fileInfo.Name())
+		if ext == "" {
+			return nil
+		}
+		if filePath == "" {
+			return nil
+		}
+		if filterPath != "" && strings.HasPrefix(filePath, filterPath) {
+			return nil
+		}
+
+		count++
+		if count >= maxCount {
+			return ErrEnoughCount
+		}
+
+		appended := false
+		for modTime, imgs := range modTime2Imgs {
+			if math.Abs(float64(modTime-fileInfo.ModTime().Unix())) <= 3 {
+				appended = true
+				imgs = append(imgs, filePath)
+				break
+			}
+		}
+		if !appended {
+			modTime2Imgs[fileInfo.ModTime().Unix()] = append(modTime2Imgs[fileInfo.ModTime().Unix()], filePath)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (m *ImageMgr) GetImages(limit int, tokenStr string) (total int, resp [][]string, nextToken string, err error) {
+
+	defer func() {
+		log.Infof("GetImages limit=%v token=%v total=%v return[len=%v next=%v err=%v]", limit, tokenStr, len(m.Images), len(resp), nextToken, err)
+	}()
+
+	if limit <= 0 {
+		nextToken = tokenStr
+		return
+	}
+
+	if len(m.Images) == 0 {
+		err = errors.New("no images")
+		return
+	}
+
+	total = len(m.Images)
+
+	lastIdx, _ := strconv.Atoi(tokenStr)
+
+	if lastIdx >= len(m.Images) {
+		err = errors.New("no more images")
+		return
+	}
+
+	nextToken = strconv.Itoa(lastIdx + limit)
+
+	if lastIdx+limit < len(m.Images) {
+		resp = m.Images[lastIdx : lastIdx+limit]
+	} else {
+		resp = m.Images[lastIdx:]
+		nextToken = ""
+	}
+
+	log.Printf("here1 [%v~%v] resp(%v):%v", lastIdx, lastIdx+limit, len(resp), resp)
+
+	for i := range resp {
+		resp[i] = utils.RemoveEmpty(resp[i])
+	}
+
+	newResp := [][]string{}
+	for _, elem := range resp {
+		if len(elem) == 0 {
+			continue
+		}
+		newResp = append(newResp, elem)
+	}
+
+	resp = newResp
+
+	//log.Printf("here2 resp(%v):%v", len(resp), resp)
 
 	return
 }
