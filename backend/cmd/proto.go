@@ -29,3 +29,8 @@ type GetImagesRespElemElem struct {
 	Name string `json:"name,omitempty"`
 	Size string `json:"size,omitempty"`
 }
+
+type SettingResp struct {
+	VideoFromDir string `json:"video_from_dir,omitempty"`
+	VideoToDir   string `json:"video_to_dir,omitempty"`
+}

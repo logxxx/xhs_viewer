@@ -28,8 +28,8 @@ type VideoMgr struct {
 }
 
 func InitMgr(vFromDirs []string, vToDir, iFromDir, iToDir string) {
-	videoMgr = NewVideoMgr(vFromDirs, vToDir, 1000)
-	imgMgr = NewImageMgr(iFromDir, iToDir, 1000)
+	videoMgr = NewVideoMgr(vFromDirs, vToDir, 100)
+	imgMgr = NewImageMgr(iFromDir, iToDir, 100)
 }
 
 func GetVideoMgr() *VideoMgr {
@@ -62,6 +62,14 @@ func NewVideoMgr(from []string, to string, maxCount int) *VideoMgr {
 		log.Errorf("PreloadVideos err:%v", err)
 	}
 	return resp
+}
+
+func (m *VideoMgr) SetFromDir(fromDir string) {
+	m.FromDirs = []string{fromDir}
+}
+
+func (m *VideoMgr) SetToDir(toDir string) {
+	m.ToDir = toDir
 }
 
 func (m *VideoMgr) PreloadVideos() error {
@@ -143,7 +151,7 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 
 	currCount := 0
 	for _, dir := range dirs {
-		err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
+		err = fileutil.ScanFiles(dir, true, func(filePath string, fileInfo os.FileInfo) error {
 
 			if strings.HasSuffix(filePath, "thumb.mp4") {
 				return nil
@@ -153,9 +161,9 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 				return ErrEnoughCount
 			}
 
-			if fileInfo.Size() <= 20*1024*1024 {
-				return nil
-			}
+			//if fileInfo.Size() <= 100*1024*1024 {
+			//	return nil
+			//}
 
 			if !fileutil.IsVideo(fileInfo.Name()) {
 				return nil
@@ -175,12 +183,12 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 			return nil
 		})
 		if err != nil && err != ErrEnoughCount {
-			log.Errorf("ScanFiles err:%v", err)
+			log.Errorf("findAllVideos ScanFiles err:%v", err)
 			return
 		}
 	}
 
-	log.Infof("get %v videos", len(vs))
+	//log.Infof("get %v videos", len(vs))
 
 	sort.Slice(vs, func(i, j int) bool {
 		return vs[i].Size > vs[j].Size
@@ -214,9 +222,6 @@ type ImageMgr struct {
 }
 
 func NewImageMgr(from, to string, maxCount int) *ImageMgr {
-	if from == to {
-		panic("from dir and to dir cannot totally same!")
-	}
 
 	resp := &ImageMgr{
 		FromDir:  from,
@@ -226,7 +231,7 @@ func NewImageMgr(from, to string, maxCount int) *ImageMgr {
 
 	err := resp.PreloadImages()
 	if err != nil {
-		panic(err)
+		log.Errorf("NewImageMgr PreloadImages err:%v", err)
 	}
 	return resp
 
@@ -254,7 +259,7 @@ func findAllImages(dir string, filterPath string, maxCount int) (images [][]stri
 	modTime2Imgs := map[int64][]string{}
 
 	count := 0
-	err = fileutil.ScanFiles(dir, func(filePath string, fileInfo os.FileInfo) error {
+	err = fileutil.ScanFiles(dir, true, func(filePath string, fileInfo os.FileInfo) error {
 
 		ext := GetImageExt(fileInfo.Name())
 		if ext == "" {

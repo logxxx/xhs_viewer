@@ -15,10 +15,50 @@
 
     <van-floating-bubble type="" v-model:offset="show_btn_offset" icon="eye" @click='switchShowOpt' />
 
-    <van-floating-bubble v-model:offset="reload_btn_offset" icon="arrow-double-right"  @click='doReload'/>
-    <van-floating-bubble v-model:offset="preview_btn_offset" icon="arrow-left"  @click='this.isPreview = !this.isPreview'/>
-
     <van-floating-bubble v-model:offset="delete_btn_offset" icon="delete"  @click='doAction("delete")'/>
+
+    <van-floating-bubble  v-model:offset="setting_btn_offset" icon="setting"  @click='openSetting()'/>
+
+    <van-popup
+        v-model:show="show_setting"
+        position="bottom"
+        :style="{ height: '70%' }"
+    >
+
+      <div style="padding-top:50px;">
+        <van-row>
+          <van-button class="setting_btn" type="success" @click='this.doReload();this.closeSetting()'>重新加载</van-button>
+
+          <van-button class="setting_btn" type="success" @click='this.isPreview = !this.isPreview;this.show_setting=false'>切换为{{this.isPreview?'高清':'预览'}}模式</van-button>
+
+        </van-row>
+
+        <van-row>
+          <span style="width:80%">
+            <van-field v-model="this.setting.video_from_dir" label="当前" />
+          </span>
+          <span style="width:20%">
+            <van-button style="width:90%" type="small" @click="updateSetting">更新</van-button>
+          </span>
+
+        </van-row>
+
+        <van-row>
+
+          <span style="width:80%">
+            <van-field v-model="this.setting.video_to_dir" label="保存" />
+          </span>
+          <span style="width:20%">
+            <van-button style="width:90%" type="small"@click="updateSetting">更新</van-button>
+          </span>
+
+        </van-row>
+
+      </div>
+
+
+    </van-popup>
+
 
     <div v-show="showAct" style="position:absolute;bottom:50px;display:flex;">
       <van-space direction="vertical" fill style="margin:0 10px">
@@ -35,9 +75,10 @@
         <van-button class="btn" type="primary" @click='doAction("mine")'>我看</van-button>
         <van-button class="btn" type="success" @click='doAction("foot")'>海底</van-button>
       </van-space>
-      <div style="display:flex;flex-direction:column-reverse; margin:0 10px ">
-        <div style="color:white;background-color:black;">
-          {{this.getCurrentVideoName()}}
+      <div style="display:flex;flex-direction:column-reverse; margin:0 10px;">
+        <div style="color:white;background-color: rgba(0, 0, 0, 0.5);">
+
+          <van-text-ellipsis  style="width:120px" rows="7" :content="this.getCurrentVideoName()"></van-text-ellipsis>
         </div>
 
       </div>
@@ -59,10 +100,10 @@ export default {
     return {
       total: 0,
       showAct: true,
-      show_btn_offset: {x: 20, y: 420},
-      delete_btn_offset: {x: 20, y: 300},
-      reload_btn_offset: {x: 20, y: 20},
-      preview_btn_offset: {x: 20, y:150},
+      show_btn_offset: {x: 20, y: 300},
+      delete_btn_offset: {x: 20, y: 200},
+      setting_btn_offset: {y: 20},
+
       videos: [],
       nextToken: '',
       watchingVideoIdx: 0,
@@ -70,15 +111,39 @@ export default {
       pingIntervalID: null,
       pingID: 0,
       isPreview: true,
+      show_setting: false,
+      setting: {},
     }
   },
   mounted(){
+    this.getSetting()
     this.getVideos()
   },
   created(){
 
   },
   methods: {
+
+    updateSetting: function() {
+      this.apiUpdateSetting()
+      this.closeSetting()
+      this.doReload()
+    },
+
+    apiUpdateSetting:function() {
+      let reqURL = this.getHost()+"viewer/setting"
+      axios.post(reqURL, this.setting).then(resp=>{
+        showToast(resp.data)
+      })
+    },
+
+    openSetting: function() {
+      this.show_setting = true
+    },
+
+    closeSetting: function() {
+      this.show_setting = false
+    },
 
     switchPing:function() {
       if(this.pingIntervalID) {
@@ -127,7 +192,7 @@ export default {
     },
 
     getHost: function() {
-      //return "http://192.168.50.47:9887/"
+      //return "http://127.0.0.1:9887/"
       return ""
     },
 
@@ -139,6 +204,13 @@ export default {
       var resp= this.getHost()+"viewer/file?name="+video.name+"&id="+video.id + "&is_preview=" + this.isPreview
       console.log("getFileURL resp:", resp)
       return resp
+    },
+
+    getSetting: function() {
+      let reqURL = this.getHost()+"viewer/setting"
+      axios.get(reqURL).then(resp=>{
+        this.setting = resp.data
+      })
     },
 
     getVideos: function() {
@@ -179,6 +251,7 @@ export default {
       this.apiReload()
       this.nextToken = ""
       this.getVideos()
+      this.getSetting()
     },
 
     apiReload: function() {
@@ -252,6 +325,14 @@ export default {
 
 .btn{
   width:100px;
+}
+
+.setting_btn{
+  margin: 15px !important
+}
+
+.setting_text{
+  color:white;
 }
 
 .btn_del {

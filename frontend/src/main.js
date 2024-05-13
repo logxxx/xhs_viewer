@@ -13,6 +13,9 @@ import { FloatingBubble } from 'vant';
 import { Tabbar, TabbarItem } from 'vant';
 import { ConfigProvider } from 'vant';
 import { Space } from 'vant';
+import { Popup } from 'vant';
+import { Field, CellGroup } from 'vant';
+import { TextEllipsis } from 'vant';
 
 const app = createApp(Video)
 app.use(Button);
@@ -25,5 +28,10 @@ app.use(Tabbar);
 app.use(TabbarItem);
 app.use(ConfigProvider);
 app.use(Space);
+app.use(Popup);
+app.use(Field);
+app.use(CellGroup);
+app.use(TextEllipsis);
+
 
 app.mount('#video_page')

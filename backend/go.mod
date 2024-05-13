@@ -5,12 +5,13 @@ go 1.20
 require (
 	github.com/gdamore/tcell/v2 v2.6.1-0.20231203215052-2917c3801e73
 	github.com/gin-gonic/gin v1.9.1
-	github.com/logxxx/utils v1.0.72
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/rivo/tview v0.0.0-20240101144852-b3bd1aa5e9f2
 	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
+
+require github.com/logxxx/utils v1.0.81
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

@@ -23,6 +23,45 @@ func initWeb(g *gin.Engine) {
 
 	mgr := GetVideoMgr()
 
+	g.GET("/viewer/setting", func(c *gin.Context) {
+		resp := &SettingResp{
+			VideoFromDir: strings.Join(GetVideoMgr().FromDirs, ","),
+			VideoToDir:   GetVideoMgr().ToDir,
+		}
+		c.JSON(200, resp)
+	})
+
+	g.POST("/viewer/setting", func(c *gin.Context) {
+		req := &SettingResp{}
+		reqresp.ParseReq(c, req)
+
+		log.Infof("set setting req:%+v", req)
+
+		settled := false
+		if req.VideoFromDir != "" && strings.Join(GetVideoMgr().FromDirs, ",") != req.VideoFromDir {
+			if utils.HasFile(req.VideoFromDir) {
+				GetVideoMgr().SetFromDir(req.VideoFromDir)
+				GetVideoMgr().PreloadVideos()
+				settled = true
+			}
+		}
+		if req.VideoToDir != "" && GetVideoMgr().ToDir != req.VideoToDir {
+			os.MkdirAll(req.VideoToDir, 0755)
+			if utils.HasFile(req.VideoToDir) {
+				GetVideoMgr().SetToDir(req.VideoToDir)
+				settled = true
+			}
+		}
+
+		resp := "设置失败"
+		if settled {
+			resp = "设置成功"
+		}
+
+		c.String(200, resp)
+
+	})
+
 	g.GET("/viewer/reload_video", func(c *gin.Context) {
 		log.Infof("reload video!")
 		mgr.PreloadVideos()
@@ -43,25 +82,33 @@ func initWeb(g *gin.Engine) {
 
 		if reqAction != "" {
 			if reqAction == "delete" {
-				//fileutil.WriteToFile([]byte("0"), filePath)
+				fileutil.AppendToFile("xhs_delete.txt", "\n"+filePath)
+				err := os.Remove(filePath)
+				if err != nil {
+					runutil.GoRunSafe(func() {
+						time.Sleep(10 * time.Second)
+						os.Remove(filePath)
+					})
+				}
+			} else {
+				dstDir := GetVideoMgr().ToDir
+				err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
+				log.Infof("moveto:%v=>%v err:%v", filePath, filepath.Join(dstDir, reqAction), err)
+				if err != nil {
+					runutil.GoRunSafe(func() {
+						time.Sleep(10 * time.Second)
+						err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
+						log.Infof("try move TWICE:%v=>%v err:%v", utils.B64To(reqID), filepath.Join(dstDir, reqAction), err)
+						if err != nil && strings.Contains(err.Error(), "used") {
+							AddToErrBinlog(filePath, filepath.Join(dstDir, reqAction), err)
+						} else {
+
+							log.Infof("no need add to binlog")
+						}
+					})
+				}
 			}
 
-			dstDir := *flagVideoToDir
-			err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
-			log.Infof("moveto:%v=>%v err:%v", filePath, filepath.Join(dstDir, reqAction), err)
-			if err != nil {
-				runutil.GoRunSafe(func() {
-					time.Sleep(10 * time.Second)
-					err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
-					log.Infof("try move TWICE:%v=>%v err:%v", utils.B64To(reqID), filepath.Join(dstDir, reqAction), err)
-					if err != nil && strings.Contains(err.Error(), "used") {
-						AddToErrBinlog(filePath, filepath.Join(dstDir, reqAction), err)
-					} else {
-
-						log.Infof("no need add to binlog")
-					}
-				})
-			}
 		}
 
 		mgr.RemoveVideo(filePath)
