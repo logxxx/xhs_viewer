@@ -20,6 +20,8 @@ var (
 	flagImageFromDir  = flag.String("image_from_dir", "", "")
 	flagImageToDir    = flag.String("image_to_dir", "", "")
 	flagImageMaxCount = flag.Int("image_max_count", 1000, "")
+
+	flagDistDir = flag.String("dist_dir", "", "")
 )
 
 func main() {
@@ -40,6 +42,10 @@ func main() {
 	wd, _ := os.Getwd()
 	log.Infof("wd:%v", wd)
 	flag.Parse()
+
+	if !utils.HasFile(*flagDistDir) {
+		panic("invalid distDir")
+	}
 
 	videoFromDirs := strings.Split(*flagVideoFromDirs, ",")
 

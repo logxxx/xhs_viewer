@@ -62,18 +62,18 @@
 
     <div v-show="showAct" style="position:absolute;bottom:50px;display:flex;">
       <van-space direction="vertical" fill style="margin:0 10px">
-        <van-button class="btn" type="success" @click='doAction("richang")'>日常</van-button>
-        <van-button class="btn" type="warning" @click='doAction("best")'>绝了</van-button>
-        <van-button class="btn" type="primary" @click='doAction("good")'>不错</van-button>
-        <van-button class="btn" type="" @click='doAction("normal")'>还行</van-button>
+        <van-button class="btn" type="success" @click='doAction(this.actionTmpl[0].value)'>{{this.actionTmpl[0].show}}</van-button>
+        <van-button class="btn" type="warning" @click='doAction(this.actionTmpl[2].value)'>{{this.actionTmpl[2].show}}</van-button>
+        <van-button class="btn" type="primary" @click='doAction(this.actionTmpl[4].value)'>{{this.actionTmpl[4].show}}</van-button>
+        <van-button class="btn" type="" @click='doAction(this.actionTmpl[6].value)'>{{this.actionTmpl[6].show}}</van-button>
         <van-button class="btn" icon="arrow-double-right" type="primary" round @click="speedup"></van-button>
       </van-space>
       <van-space direction="vertical" fill style="">
-        <van-button class="btn" type="" @click='doAction("other")'>其他</van-button>
-        <van-button class="btn" type="" @click='doAction("fabu_putong")'>发普</van-button>
-        <van-button class="btn" type="warning" @click='doAction("fabu_nv")'>发女</van-button>
-        <van-button class="btn" type="primary" @click='doAction("mine")'>我看</van-button>
-        <van-button class="btn" type="success" @click='doAction("foot")'>海底</van-button>
+        <van-button class="btn" type="" @click='doAction(this.actionTmpl[1].value)'>{{this.actionTmpl[1].show}}</van-button>
+        <van-button class="btn" type="" @click='doAction(this.actionTmpl[3].value)'>{{this.actionTmpl[3].show}}</van-button>
+        <van-button class="btn" type="warning" @click='doAction(this.actionTmpl[5].value)'>{{this.actionTmpl[5].show}}</van-button>
+        <van-button class="btn" type="primary" @click='doAction(this.actionTmpl[7].value)'>{{this.actionTmpl[7].show}}</van-button>
+        <van-button class="btn" type="success" @click='doAction(this.actionTmpl[9].value)'>{{this.actionTmpl[9].show}}</van-button>
       </van-space>
       <div style="display:flex;flex-direction:column-reverse; margin:0 10px;">
         <div style="color:white;background-color: rgba(0, 0, 0, 0.5);">
@@ -113,6 +113,13 @@ export default {
       isPreview: true,
       show_setting: false,
       setting: {},
+      actionTmpl:[
+        {show:'日常',value:'richang'},{show:'其他',value:'other'},
+        {show:'绝了',value:'best'},{show:'发普',value:'fabu_putong'},
+        {show:'不错',value:'good'},{show:'发女',value:'fabu_nv'},
+        {show:'还行',value:'normal'},{show:'我看',value:'mine'},
+        {show:'加速',value:'加速'},{show:'海底',value:'foot'},
+      ],
     }
   },
   mounted(){
@@ -192,8 +199,8 @@ export default {
     },
 
     getHost: function() {
-      //return "http://127.0.0.1:9887/"
-      return ""
+      return "http://testnas.com:9887/"
+      //return ""
     },
 
     getFileURL: function() {

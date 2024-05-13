@@ -92,12 +92,12 @@ func initWeb(g *gin.Engine) {
 				}
 			} else {
 				dstDir := GetVideoMgr().ToDir
-				err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
+				err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction), 0755)
 				log.Infof("moveto:%v=>%v err:%v", filePath, filepath.Join(dstDir, reqAction), err)
 				if err != nil {
 					runutil.GoRunSafe(func() {
 						time.Sleep(10 * time.Second)
-						err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction))
+						err := fileutil.MoveFileToDir(filePath, filepath.Join(dstDir, reqAction), 0755)
 						log.Infof("try move TWICE:%v=>%v err:%v", utils.B64To(reqID), filepath.Join(dstDir, reqAction), err)
 						if err != nil && strings.Contains(err.Error(), "used") {
 							AddToErrBinlog(filePath, filepath.Join(dstDir, reqAction), err)
@@ -248,6 +248,6 @@ func initWeb(g *gin.Engine) {
 		}
 
 	})
-	g.StaticFile("/", `D:\mytest\mywork\xhs_viewer\frontend\dist\index.html`)
-	g.StaticFS("/dist", gin.Dir(`D:\mytest\mywork\xhs_viewer\frontend\dist`, true))
+	g.StaticFile("/", *flagDistDir)
+	g.StaticFS("/dist", gin.Dir(*flagDistDir, true))
 }

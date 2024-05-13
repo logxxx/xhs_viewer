@@ -11,7 +11,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require github.com/logxxx/utils v1.0.81
+require github.com/logxxx/utils v1.0.82
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

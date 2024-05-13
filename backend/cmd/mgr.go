@@ -90,11 +90,11 @@ func (m *VideoMgr) RemoveVideo(path string) {
 	for i := range m.Videos {
 		if m.Videos[i] == path {
 			m.Videos[i] = ""
-			log.Infof("......remove video succ. idx=%v path=%v", i, path)
+			//log.Infof("......remove video from mgr succ. idx=%v path=%v", i, path)
 			return
 		}
 	}
-	log.Infof("!!!!!!!!!!!!!!remove video fAILED!!! path=%v", path)
+	//log.Infof("!!!!!!!!!!!!!!remove video from mgr FAILED!!! path=%v", path)
 }
 
 func (m *VideoMgr) GetVideos(limit int, tokenStr string) (total int, resp []string, nextToken string, err error) {

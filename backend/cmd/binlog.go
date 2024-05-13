@@ -45,7 +45,7 @@ func RunBinlog() {
 			log.Infof("binlog.delete skip:%v", row.Error)
 			continue
 		}
-		err := fileutil.MoveFileToDir(row.From, row.To)
+		err := fileutil.MoveFileToDir(row.From, row.To, 0755)
 		if err == nil {
 			log.Infof("binlog.delete succ!")
 			continue
