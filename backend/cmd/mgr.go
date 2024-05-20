@@ -76,10 +76,13 @@ func (m *VideoMgr) PreloadVideos() error {
 
 	videos, err := findAllVideos(m.FromDirs, m.ToDir, m.MaxCount)
 	if err != nil && err != ErrEnoughCount {
+		log.Errorf("VideoMgr.PreloadVideos err:%v", err)
 		return err
 	}
 	if len(videos) == 0 {
-		return errors.New("no video find")
+		err = errors.New("no video find")
+		log.Errorf("VideoMgr.PreloadVideos err:%v", err)
+		return err
 	}
 	log.Infof("VideoMgr.PreloadVideos get %v videos", len(videos))
 	m.Videos = videos
@@ -142,6 +145,10 @@ func (m *VideoMgr) GetVideos(limit int, tokenStr string) (total int, resp []stri
 // 预加载视频
 func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []string, err error) {
 
+	logger := log.WithField("dirs", dirs).WithField("filter_path", filterPath).WithField("maxCount", maxCount)
+
+	logger.Infof("func start")
+
 	type VideoWithSize struct {
 		Path string
 		Size int64
@@ -179,11 +186,11 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 				Size: fileInfo.Size(),
 			})
 			currCount++
-			log.Debugf("add video:%v", filePath)
+			logger.Debugf("add video:%v", filePath)
 			return nil
 		})
 		if err != nil && err != ErrEnoughCount {
-			log.Errorf("findAllVideos ScanFiles err:%v", err)
+			logger.Errorf("findAllVideos ScanFiles err:%v", err)
 			return
 		}
 	}
@@ -200,6 +207,8 @@ func findAllVideos(dirs []string, filterPath string, maxCount int) (videos []str
 	}
 
 	videos = resp
+
+	logger.WithField("resp_len", len(videos)).Infof("func end")
 
 	return
 }

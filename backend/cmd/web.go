@@ -38,12 +38,10 @@ func initWeb(g *gin.Engine) {
 		log.Infof("set setting req:%+v", req)
 
 		settled := false
-		if req.VideoFromDir != "" && strings.Join(GetVideoMgr().FromDirs, ",") != req.VideoFromDir {
-			if utils.HasFile(req.VideoFromDir) {
-				GetVideoMgr().SetFromDir(req.VideoFromDir)
-				GetVideoMgr().PreloadVideos()
-				settled = true
-			}
+		if req.VideoFromDir != "" && strings.Join(GetVideoMgr().FromDirs, ",") != req.VideoFromDir && utils.HasFile(req.VideoFromDir) {
+			GetVideoMgr().SetFromDir(req.VideoFromDir)
+			GetVideoMgr().PreloadVideos()
+			settled = true
 		}
 		if req.VideoToDir != "" && GetVideoMgr().ToDir != req.VideoToDir {
 			os.MkdirAll(req.VideoToDir, 0755)
